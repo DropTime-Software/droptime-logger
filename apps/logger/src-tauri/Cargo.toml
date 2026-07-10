@@ -27,6 +27,16 @@ tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 serialport = "4"
 py_literal = "0.4"
 ureq = { version = "2", features = ["json"] }
+# Phidgets FFI (behind the off-by-default `phidgets` feature). Pinned exactly:
+# single-maintainer crate — vendor it if it ever moves in a breaking way.
+# Linking requires a staged libphidget22; see scripts/build-libphidget22.sh
+# and src/capture/PHIDGETS-SPIKE.md.
+phidget = { version = "=0.4.1", optional = true }
+
+[features]
+# OFF by default so plain `cargo test`/`cargo build` never needs libphidget22.
+# Enable with: ./scripts/build-libphidget22.sh && cargo test --features phidgets
+phidgets = ["dep:phidget"]
 
 [dev-dependencies]
 # pty for the TC4 emulator example (openpty lives behind the `term` feature;
