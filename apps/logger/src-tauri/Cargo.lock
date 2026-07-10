@@ -803,6 +803,7 @@ name = "droptime-logger"
 version = "0.1.2"
 dependencies = [
  "nix 0.30.1",
+ "phidget",
  "py_literal",
  "rusqlite",
  "serde",
@@ -2661,6 +2662,21 @@ checksum = "e57fef6bc5981e38c2ce2d63bfa546861309f875b8a75f092d1d54ae2d64f266"
 dependencies = [
  "siphasher",
 ]
+
+[[package]]
+name = "phidget"
+version = "0.4.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "97df01ecc3d713aa5ee87ba73810063e4bbfc25cdde0fbae86ee55eacf82cc49"
+dependencies = [
+ "phidget-sys",
+]
+
+[[package]]
+name = "phidget-sys"
+version = "0.1.5"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "9d1219992cca4fb9fbb45b15989442ec26d30c059c77955300e8db4585bf3a24"
 
 [[package]]
 name = "pin-project-lite"
