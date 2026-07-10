@@ -1,6 +1,6 @@
 {
   "name": "logger-app",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "private": true,
   "description": "Droptime Logger — free desktop roast logger (Tauri 2). Local-first capture, syncs to Droptime when signed in.",
   "type": "module",

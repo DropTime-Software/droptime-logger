@@ -10,6 +10,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 _Next up: Phidgets and MODBUS drivers, code signing + notarization, and a standalone driver SDK (Apache-2.0)._
 
 
+## [0.1.2] - 2026-07-11
+
+### Fixed
+
+- The About dialog and Settings now state the actual license (AGPL-3.0); they
+  previously showed a placeholder from before the license was finalized.
+
 ## [0.1.1] - 2026-07-10
 
 ### Changed
@@ -74,6 +81,7 @@ The first public release. Droptime Logger is a free, local-first, open-source ro
 - The update check is notice-only; there is no automatic in-app update.
 - Linux support is experimental and best-effort, not a supported tier.
 
-[Unreleased]: https://github.com/DropTime-Software/droptime-logger/compare/v0.1.1...HEAD
+[Unreleased]: https://github.com/DropTime-Software/droptime-logger/compare/v0.1.2...HEAD
+[0.1.2]: https://github.com/DropTime-Software/droptime-logger/compare/v0.1.1...v0.1.2
 [0.1.1]: https://github.com/DropTime-Software/droptime-logger/compare/v0.1.0...v0.1.1
 [0.1.0]: https://github.com/DropTime-Software/droptime-logger/releases/tag/v0.1.0
