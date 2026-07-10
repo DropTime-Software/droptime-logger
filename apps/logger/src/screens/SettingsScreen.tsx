@@ -201,7 +201,7 @@ export function SettingsScreen({ mode }: { mode: AppMode }) {
             </div>
             <div className="flex items-center justify-between py-1">
               <span className="text-ink/55">License</span>
-              <span className="font-medium text-pine">Apache-2.0 / MIT — free and open source</span>
+              <span className="font-medium text-pine">AGPL-3.0 — free and open source</span>
             </div>
           </div>
         </Section>

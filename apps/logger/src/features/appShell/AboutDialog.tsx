@@ -44,7 +44,7 @@ export function AboutDialog({
         <dl className="mt-5 space-y-1.5 rounded-xl bg-gray-50 p-3 text-sm">
           <Row label="Version" value={version} />
           <Row label="Platform" value={platform} />
-          <Row label="License" value="Apache-2.0 / MIT" />
+          <Row label="License" value="AGPL-3.0 — open source" />
         </dl>
 
         <div className="mt-5 flex flex-wrap justify-center gap-2">
