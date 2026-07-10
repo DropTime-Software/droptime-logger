@@ -8,7 +8,7 @@ body:
       value: |
         Thanks for taking the time to file this. The more precisely you describe what happened, the faster we can fix it.
 
-        Quick check first: please search [existing issues](https://github.com/RyanLuttrell/droptime-logger/issues) so we don't duplicate work.
+        Quick check first: please search [existing issues](https://github.com/OutsideTheBoxDev/droptime-logger/issues) so we don't duplicate work.
   - type: input
     id: version
     attributes:

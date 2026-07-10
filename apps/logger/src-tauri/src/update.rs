@@ -18,10 +18,10 @@ use crate::model::{AppInfoDto, UpdateInfoDto};
 /// extracted (repo-extraction task); keep the
 /// `…/releases/latest/download/latest.json` shape.
 pub const LATEST_JSON_URL: &str =
-    "https://github.com/RyanLuttrell/droptime-logger/releases/latest/download/latest.json";
+    "https://github.com/OutsideTheBoxDev/droptime-logger/releases/latest/download/latest.json";
 
 /// The human-facing releases page we send people to for a notice-only update.
-pub const RELEASES_PAGE_URL: &str = "https://github.com/RyanLuttrell/droptime-logger/releases";
+pub const RELEASES_PAGE_URL: &str = "https://github.com/OutsideTheBoxDev/droptime-logger/releases";
 
 /// How long to wait for the feed before giving up (connect + read).
 const REQUEST_TIMEOUT: Duration = Duration::from_secs(3);
