@@ -1,0 +1,43 @@
+[package]
+name = "droptime-logger"
+version = "0.1.0"
+description = "Droptime Logger — free desktop roast logger"
+edition = "2021"
+rust-version = "1.82"
+
+[lib]
+name = "droptime_logger_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+tauri = { version = "2", features = [] }
+tauri-plugin-dialog = "2"
+tauri-plugin-notification = "2"
+tauri-plugin-opener = "2"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+rusqlite = { version = "0.40", features = ["bundled"] }
+uuid = { version = "1", features = ["v4", "v7", "serde"] }
+thiserror = "2"
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+serialport = "4"
+py_literal = "0.4"
+ureq = { version = "2", features = ["json"] }
+
+[dev-dependencies]
+# pty for the TC4 emulator example (openpty lives behind the `term` feature;
+# `fs` adds fcntl for the emulator's non-blocking master reads).
+nix = { version = "0.30", features = ["term", "fs"] }
+
+[profile.dev]
+incremental = true
+
+[profile.release]
+codegen-units = 1
+lto = true
+opt-level = "s"
+strip = true

@@ -1,0 +1,194 @@
+# Droptime Logger release — push a `v*` tag and this workflow builds installers
+# for every supported platform, uploads them to a draft GitHub Release, generates
+# `latest.json` (the in-app update check reads it), and publishes the release.
+#
+# v0.1.0 ships without code signing or updater signing (planned for v0.1.1), so
+# latest.json is notice-only: version + download URLs, no signature fields.
+
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  # Create the draft release up front so the build matrix never races to create it.
+  draft:
+    name: Create draft release
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    outputs:
+      release_id: ${{ steps.create.outputs.release_id }}
+    steps:
+      - name: Create the draft release
+        id: create
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          release_id=$(gh api "repos/${GITHUB_REPOSITORY}/releases" \
+            -f tag_name="${GITHUB_REF_NAME}" \
+            -f name="Droptime Logger ${GITHUB_REF_NAME}" \
+            -f body="See [CHANGELOG.md](https://github.com/${GITHUB_REPOSITORY}/blob/main/CHANGELOG.md) for what's new." \
+            -F draft=true \
+            --jq '.id')
+          echo "release_id=${release_id}" >> "$GITHUB_OUTPUT"
+
+  build:
+    name: Build — ${{ matrix.name }}
+    needs: draft
+    permissions:
+      contents: write
+    strategy:
+      fail-fast: false
+      matrix:
+        # Runner notes: macos-13 was retired by GitHub (Intel is now served by the
+        # macos-15-intel label) and macos-14 is deprecated, so both macOS builds
+        # target macOS 15 images.
+        include:
+          - name: macOS Apple Silicon
+            os: macos-15
+            rust-targets: aarch64-apple-darwin
+            args: --target aarch64-apple-darwin
+            experimental: false
+          - name: macOS Intel
+            os: macos-15-intel
+            rust-targets: x86_64-apple-darwin
+            args: --target x86_64-apple-darwin
+            experimental: false
+          - name: Windows x64
+            os: windows-latest
+            rust-targets: ''
+            args: --bundles nsis
+            experimental: false
+          - name: Linux AppImage (experimental)
+            os: ubuntu-22.04
+            rust-targets: ''
+            args: --bundles appimage
+            experimental: true
+    runs-on: ${{ matrix.os }}
+    continue-on-error: ${{ matrix.experimental }}
+    steps:
+      - name: Check out
+        uses: actions/checkout@v5
+
+      - name: Install Tauri system dependencies (Linux)
+        if: startsWith(matrix.os, 'ubuntu')
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            libwebkit2gtk-4.1-dev \
+            libgtk-3-dev \
+            libayatana-appindicator3-dev \
+            librsvg2-dev \
+            libudev-dev
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Install Node
+        uses: actions/setup-node@v5
+        with:
+          node-version: 20
+          cache: pnpm
+
+      - name: Install Rust (stable)
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.rust-targets }}
+
+      - name: Cache cargo
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: apps/logger/src-tauri
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build installers and upload to the draft release
+        uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          projectPath: apps/logger
+          releaseId: ${{ needs.draft.outputs.release_id }}
+          args: ${{ matrix.args }}
+
+  finalize:
+    name: Generate latest.json and publish
+    needs: [draft, build]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Generate latest.json
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RELEASE_ID: ${{ needs.draft.outputs.release_id }}
+        run: |
+          set -euo pipefail
+          tag="${GITHUB_REF_NAME}"
+          version="${tag#v}"
+          base="https://github.com/${GITHUB_REPOSITORY}/releases/download/${tag}"
+
+          assets=$(gh api "repos/${GITHUB_REPOSITORY}/releases/${RELEASE_ID}/assets" --paginate --jq '.[].name')
+          echo "Release assets:"
+          echo "${assets}"
+
+          pick() {
+            local match
+            match=$(echo "${assets}" | grep -iE "$1" | head -n 1)
+            if [ -z "${match}" ]; then
+              echo "::error::No release asset matches pattern: $1"
+              exit 1
+            fi
+            echo "${match}"
+          }
+
+          darwin_aarch64=$(pick 'aarch64.*\.dmg$')
+          darwin_x86_64=$(pick '(x64|x86_64).*\.dmg$')
+          windows_x86_64=$(pick '(x64|x86_64).*setup\.exe$')
+
+          jq -n \
+            --arg version "${version}" \
+            --arg notes "Droptime Logger ${tag} — release notes: https://github.com/${GITHUB_REPOSITORY}/releases/tag/${tag}" \
+            --arg pub_date "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+            --arg darwin_aarch64 "${base}/${darwin_aarch64}" \
+            --arg darwin_x86_64 "${base}/${darwin_x86_64}" \
+            --arg windows_x86_64 "${base}/${windows_x86_64}" \
+            '{
+              version: $version,
+              notes: $notes,
+              pub_date: $pub_date,
+              platforms: {
+                "darwin-aarch64": { url: $darwin_aarch64 },
+                "darwin-x86_64": { url: $darwin_x86_64 },
+                "windows-x86_64": { url: $windows_x86_64 }
+              }
+            }' > latest.json
+
+          cat latest.json
+
+      - name: Upload latest.json to the release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RELEASE_ID: ${{ needs.draft.outputs.release_id }}
+        run: |
+          set -euo pipefail
+          curl --fail --silent --show-error \
+            -X POST \
+            -H "Authorization: Bearer ${GH_TOKEN}" \
+            -H "Content-Type: application/json" \
+            --data-binary @latest.json \
+            "https://uploads.github.com/repos/${GITHUB_REPOSITORY}/releases/${RELEASE_ID}/assets?name=latest.json" > /dev/null
+
+      - name: Publish the release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RELEASE_ID: ${{ needs.draft.outputs.release_id }}
+        run: |
+          gh api -X PATCH "repos/${GITHUB_REPOSITORY}/releases/${RELEASE_ID}" \
+            -F draft=false \
+            --jq '.html_url'

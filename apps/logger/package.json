@@ -1,0 +1,35 @@
+{
+  "name": "logger-app",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Droptime Logger — free desktop roast logger (Tauri 2). Local-first capture, syncs to Droptime when signed in.",
+  "type": "module",
+  "scripts": {
+    "dev": "vite --port 5177 --strictPort",
+    "dev:desktop": "tauri dev",
+    "build": "tsc --noEmit && vite build",
+    "tauri": "tauri",
+    "lint": "tsc --noEmit",
+    "clean": "rm -rf dist .turbo node_modules"
+  },
+  "dependencies": {
+    "@droptime/roast-console": "workspace:*",
+    "@phosphor-icons/react": "^2.1.10",
+    "@tauri-apps/api": "^2.11.1",
+    "@tauri-apps/plugin-dialog": "^2.7.1",
+    "@tauri-apps/plugin-notification": "^2.3.3",
+    "@tauri-apps/plugin-opener": "^2.5.0",
+    "react": "^19.2.4",
+    "react-dom": "^19.2.4"
+  },
+  "devDependencies": {
+    "@tailwindcss/vite": "^4.1.16",
+    "@tauri-apps/cli": "^2.11.4",
+    "@types/react": "^19",
+    "@types/react-dom": "^19",
+    "@vitejs/plugin-react": "^5.1.4",
+    "tailwindcss": "^4.1.16",
+    "typescript": "^5",
+    "vite": "^7.3.4"
+  }
+}

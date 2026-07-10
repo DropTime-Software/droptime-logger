@@ -1,0 +1,47 @@
+Droptime Logger
+Copyright (c) 2026 Droptime / Ryan Luttrell
+
+Licensing
+---------
+
+Droptime Logger is free software, licensed under the GNU Affero General
+Public License, version 3 only (AGPL-3.0-only). The full license text is
+in the LICENSE file at the root of this repository, and at
+<https://www.gnu.org/licenses/agpl-3.0.html>.
+
+Unless a file or directory states otherwise, everything in this
+repository is licensed under AGPL-3.0-only. This includes the
+@droptime/roast-console package (packages/roast-console), which keeps
+the AGPL-3.0-only license when it is published to npm.
+
+Exception: the protocol documentation under docs/protocols/ is licensed
+under the Apache License, Version 2.0. See docs/protocols/LICENSE.
+
+Third-party dependencies and their licenses are listed in
+THIRD-PARTY-NOTICES.md.
+
+Source file headers
+-------------------
+
+New source files in this repository should begin with:
+
+    Droptime Logger — a local-first roast logger for coffee roasters
+    Copyright (c) 2026 Droptime / Ryan Luttrell
+    SPDX-License-Identifier: AGPL-3.0-only
+
+    This program is free software: you can redistribute it and/or modify
+    it under the terms of the GNU Affero General Public License as
+    published by the Free Software Foundation, version 3.
+
+    This program is distributed in the hope that it will be useful, but
+    WITHOUT ANY WARRANTY; without even the implied warranty of
+    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU
+    Affero General Public License for more details.
+
+The short form is acceptable where a full header is impractical:
+
+    Copyright (c) 2026 Droptime / Ryan Luttrell
+    SPDX-License-Identifier: AGPL-3.0-only
+
+Files under docs/protocols/ use `SPDX-License-Identifier: Apache-2.0`
+instead.

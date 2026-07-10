@@ -1,0 +1,17 @@
+# Dependencies
+node_modules/
+
+# Build output
+dist/
+target/
+
+# Local roast data (SQLite, incl. WAL sidecar files)
+*.db
+*.db-wal
+*.db-shm
+
+# Environment
+.env*
+
+# OS cruft
+.DS_Store

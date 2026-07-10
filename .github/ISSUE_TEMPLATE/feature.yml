@@ -1,0 +1,33 @@
+name: Feature request
+description: Suggest an improvement — start with the problem, not the solution.
+title: "[Feature]: "
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Good features start with a real problem. Tell us what you were trying to do and where the Logger got in your way — that helps us find the best fix, which sometimes isn't the one you'd expect.
+
+        One thing to know up front: Droptime Logger is a roast scope and analytics tool, not a roast controller. It reads temperatures and never actuates hardware — no PID, no burner control — so requests to control the machine are out of scope by design.
+  - type: textarea
+    id: problem
+    attributes:
+      label: What's the problem?
+      description: What were you trying to do, and what made it hard or impossible?
+      placeholder: "When I roast back-to-back batches, I lose track of..."
+    validations:
+      required: true
+  - type: textarea
+    id: idea
+    attributes:
+      label: What would help?
+      description: If you have an idea for a fix, describe it here. Optional — the problem above is what matters most.
+    validations:
+      required: false
+  - type: textarea
+    id: context
+    attributes:
+      label: Anything else?
+      description: Your roasting setup, how often this comes up, screenshots, or how other tools handle it.
+    validations:
+      required: false

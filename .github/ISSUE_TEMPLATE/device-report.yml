@@ -1,0 +1,57 @@
+name: Device report
+description: Own a roaster we don't support yet? Help us put it on the roadmap.
+title: "[Device]: <make and model>"
+labels: ["device-report"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        **10 minutes of your time gets your rig on the roadmap.**
+
+        Droptime Logger is a roast *scope* — it reads temperatures, it never controls your machine. To add support for a roaster we don't have on the bench, we need to know how yours talks. The in-app device scan does the hard part for you: it listens to your hardware and writes a diagnostic block you can paste straight into this form.
+
+        We build every driver clean-room, from vendor docs and real captures like yours — never from another project's source. Your report is exactly the input that makes that possible. Thank you for sending it.
+  - type: input
+    id: make-model
+    attributes:
+      label: Roaster make and model
+      description: Be as specific as you can — the exact model and any controller board.
+      placeholder: "Aillio Bullet R2 / Kaleido M10 / homebuilt TC4"
+    validations:
+      required: true
+  - type: dropdown
+    id: connection
+    attributes:
+      label: How does it connect to a computer?
+      description: Best guess is fine — the diagnostic block below will confirm it.
+      options:
+        - USB serial (shows up as a COM or usbserial port)
+        - USB (other or unsure)
+        - Bluetooth
+        - Wi-Fi / network
+        - MODBUS (RS-485 / RS-232)
+        - I'm not sure
+    validations:
+      required: true
+  - type: textarea
+    id: diagnostic
+    attributes:
+      label: Diagnostic block
+      description: 'Paste the diagnostic block from Setup → device scan → "Copy diagnostic".'
+      render: text
+    validations:
+      required: true
+  - type: textarea
+    id: notes
+    attributes:
+      label: Anything else worth knowing?
+      description: Firmware version, the software you use today, quirks you've noticed, or a link to the vendor's protocol docs if you have one.
+    validations:
+      required: false
+  - type: checkboxes
+    id: willing-to-test
+    attributes:
+      label: Testing
+      options:
+        - label: I'm willing to run test builds on this machine and report back.
+          required: false

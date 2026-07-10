@@ -1,0 +1,90 @@
+# Droptime Logger CI — runs on every pull request and every push to main.
+#
+# Two parallel jobs:
+#   rust — the capture engine (apps/logger/src-tauri): fmt, clippy, tests
+#   web  — the console (packages/roast-console + apps/logger): typecheck, tests, build
+
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  rust:
+    name: Rust — fmt, clippy, test
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Check out
+        uses: actions/checkout@v5
+
+      - name: Install Tauri system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            libwebkit2gtk-4.1-dev \
+            libgtk-3-dev \
+            libayatana-appindicator3-dev \
+            librsvg2-dev \
+            libudev-dev
+
+      - name: Install Rust (stable)
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+
+      - name: Cache cargo
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: apps/logger/src-tauri
+
+      - name: cargo fmt
+        run: cargo fmt --check
+        working-directory: apps/logger/src-tauri
+
+      - name: cargo clippy
+        run: cargo clippy --all-targets -- -D warnings
+        working-directory: apps/logger/src-tauri
+
+      - name: cargo test
+        run: cargo test
+        working-directory: apps/logger/src-tauri
+
+  web:
+    name: Web — typecheck, test, build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Check out
+        uses: actions/checkout@v5
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Install Node
+        uses: actions/setup-node@v5
+        with:
+          node-version: 20
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Typecheck roast-console
+        run: pnpm --filter ./packages/roast-console typecheck
+
+      - name: Test roast-console (vitest)
+        run: pnpm --filter ./packages/roast-console test
+
+      # The app's build script runs `tsc --noEmit && vite build`, so this
+      # typechecks the app and proves the frontend bundles cleanly.
+      - name: Build logger frontend (tsc + vite)
+        run: pnpm --filter ./apps/logger build

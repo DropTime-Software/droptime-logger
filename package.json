@@ -1,0 +1,27 @@
+{
+  "name": "droptime-logger",
+  "version": "0.1.0",
+  "private": true,
+  "description": "A beautiful, local-first roast logger. Free forever, open source, and your data never leaves your machine unless you say so.",
+  "license": "AGPL-3.0-only",
+  "author": "Ryan Luttrell <ryan@outsidethebox.dev>",
+  "homepage": "https://github.com/RyanLuttrell/droptime-logger",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/RyanLuttrell/droptime-logger.git"
+  },
+  "engines": {
+    "node": ">=20",
+    "pnpm": ">=9"
+  },
+  "packageManager": "pnpm@10.14.0",
+  "scripts": {
+    "dev": "pnpm --filter ./apps/logger dev:desktop",
+    "build": "pnpm --filter ./apps/logger build",
+    "tauri": "pnpm --filter ./apps/logger tauri",
+    "test": "pnpm run test:web && pnpm run test:rust",
+    "test:web": "pnpm --filter ./packages/roast-console test",
+    "test:rust": "cargo test --manifest-path apps/logger/src-tauri/Cargo.toml",
+    "typecheck": "pnpm --filter ./packages/roast-console typecheck && pnpm --filter ./apps/logger lint"
+  }
+}
