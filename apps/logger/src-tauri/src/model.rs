@@ -305,9 +305,13 @@ pub struct StartSessionArgs {
     pub speed: Option<f64>,
     #[serde(default)]
     pub meta: SessionMetaDto,
-    /// v0.1.0 (§7.2): required for `tc4:` sources; ignored for replay.
+    /// v0.1.0 (§7.2): required for device sources (`tc4:`, `modbus-tcp:`);
+    /// ignored for replay. Carried as raw JSON — the SourcePin schema is
+    /// driver-defined (SourcePinDto for tc4, `capture/modbus.rs::ModbusPin`
+    /// for modbus) and validated by the driver factory, so a malformed pin
+    /// surfaces as `invalid_args` rather than an opaque IPC decode failure.
     #[serde(default)]
-    pub source_pin: Option<SourcePinDto>,
+    pub source_pin: Option<serde_json::Value>,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -403,6 +407,12 @@ pub enum TempUnitDto {
 
 /// `machines_local.source_pin` JSON + `start_session.sourcePin` (§5).
 /// `btChannel`/`etChannel` are 1-based TC4 logical channels.
+///
+/// SourcePin is an OPEN, per-driver JSON document: this struct is the `tc4:`
+/// shape; `modbus-tcp:` pins are parsed by `capture/modbus.rs` (`ModbusPin`,
+/// shape documented in docs/protocols/modbus-generic.md). The engine carries
+/// pins as raw JSON and each driver validates its own schema, so new drivers
+/// extend the §5 shape additively without touching the frozen tc4 fields.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct SourcePinDto {

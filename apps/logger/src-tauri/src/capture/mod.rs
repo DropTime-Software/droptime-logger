@@ -6,6 +6,7 @@
 //! `start_session` fails with `session_active`.
 
 pub mod autodetect;
+pub mod modbus;
 pub mod replay;
 pub mod serial;
 pub mod tc4;
@@ -20,8 +21,16 @@ use crate::model::{
 use crate::store::{now_ms, speed_setting_key, ResumeSeed, SampleRow, Store};
 
 use autodetect::AutoMarkDetector;
+use modbus::{ModbusSource, ModbusTiming};
 use replay::ReplaySource;
 use tc4::{Tc4Source, Tc4Timing};
+
+/// Device sources that carry a SourcePin the engine must persist at start and
+/// hand back on resume (`tc4:` and `modbus-tcp:`; replay derives everything
+/// from the fixture).
+fn requires_pin(source_id: &str) -> bool {
+    source_id.starts_with("tc4:") || modbus::is_modbus_source_id(source_id)
+}
 
 /// `mm:ss` label for gap/outage durations in notes and status messages.
 fn format_mm_ss(sec: f64) -> String {
@@ -63,9 +72,10 @@ fn status_gated_sink(
     (gated, fire)
 }
 
-/// Settings key persisting a tc4 session's SourcePin JSON so `resume_session`
-/// can reconnect with the same port/channel roles (the `speed_setting_key`
-/// pattern). Written at start, removed if the start fails.
+/// Settings key persisting a device session's SourcePin JSON so
+/// `resume_session` can reconnect with the same port/register/channel roles
+/// (the `speed_setting_key` pattern). Written at start, removed if the start
+/// fails.
 pub(crate) fn pin_setting_key(roast_uuid: &str) -> String {
     format!("session_pin:{roast_uuid}")
 }
@@ -122,6 +132,8 @@ pub struct Engine {
     active: Mutex<Option<ActiveSession>>,
     /// Real-hardware defaults; tests accelerate via `set_tc4_timing`.
     tc4_timing: Tc4Timing,
+    /// Real-network defaults; tests accelerate via `set_modbus_timing`.
+    modbus_timing: ModbusTiming,
 }
 
 impl Engine {
@@ -130,12 +142,18 @@ impl Engine {
             store,
             active: Mutex::new(None),
             tc4_timing: Tc4Timing::default(),
+            modbus_timing: ModbusTiming::default(),
         }
     }
 
     #[cfg(test)]
     pub(crate) fn set_tc4_timing(&mut self, timing: Tc4Timing) {
         self.tc4_timing = timing;
+    }
+
+    #[cfg(test)]
+    pub(crate) fn set_modbus_timing(&mut self, timing: ModbusTiming) {
+        self.modbus_timing = timing;
     }
 
     pub fn store(&self) -> &Store {
@@ -152,19 +170,25 @@ impl Engine {
 
     /// Resolve a `sourceId` into a concrete `DeviceSource` (CONTRACTS.md §7.2):
     /// `replay:<fixture>` → ReplaySource; `tc4:<portName>` → Tc4Source
-    /// (requires `sourcePin`, else `invalid_args`). Construction is
+    /// (requires `sourcePin`, else `invalid_args`);
+    /// `modbus-tcp:<host>:<port>` → ModbusSource (requires a `sourcePin` with
+    /// `channels` mapping a `bt` role, else `invalid_args`). Construction is
     /// side-effect free — only `start()` spawns the read loop.
     /// `start_session_sec` seeds the device session clock (0 for a fresh
     /// session; on resume the wall-anchored seconds since started_wall_ms so
     /// the outage stays on the time axis); replay derives its clock from seq
     /// and ignores it.
+    ///
+    /// The pin arrives as raw JSON (SourcePin is a driver-defined document,
+    /// model.rs): each driver parses and validates its own schema here, so a
+    /// malformed pin fails as `invalid_args`.
     fn build_source(
         &self,
         source_id: &str,
         speed: f64,
         start_seq: u64,
         start_session_sec: f64,
-        source_pin: Option<&SourcePinDto>,
+        source_pin: Option<&serde_json::Value>,
     ) -> Result<Box<dyn DeviceSource>, LoggerError> {
         if source_id.starts_with("replay:") {
             let fixture = replay::fixture_for_source_id(source_id)
@@ -176,14 +200,16 @@ impl Engine {
                     "tc4 sources require a sourcePin (port, baud, channel roles)",
                 )
             })?;
+            let pin: SourcePinDto = serde_json::from_value(pin.clone())
+                .map_err(|e| LoggerError::invalid_args(format!("tc4 sourcePin: {e}")))?;
             Ok(Box::new(
-                Tc4Source::new(
-                    port_name.to_owned(),
-                    pin.clone(),
-                    start_seq,
-                    start_session_sec,
-                )
-                .with_timing(self.tc4_timing.clone()),
+                Tc4Source::new(port_name.to_owned(), pin, start_seq, start_session_sec)
+                    .with_timing(self.tc4_timing.clone()),
+            ))
+        } else if modbus::is_modbus_source_id(source_id) {
+            Ok(Box::new(
+                ModbusSource::from_pin(source_id, source_pin, start_seq, start_session_sec)?
+                    .with_timing(self.modbus_timing.clone()),
             ))
         } else {
             Err(LoggerError::source_not_found(source_id))
@@ -264,8 +290,9 @@ impl Engine {
             // Remembered so resume_session can replay at the same speed.
             self.store
                 .set_setting(&speed_setting_key(&roast_uuid), &speed.to_string())?;
-            // tc4: remember the pin so resume_session can reconnect the same rig.
-            if args.source_id.starts_with("tc4:") {
+            // Device sources: remember the pin so resume_session can
+            // reconnect the same rig (tc4 port/channels, modbus register map).
+            if requires_pin(&args.source_id) {
                 if let Some(pin) = args.source_pin.as_ref() {
                     let json = serde_json::to_string(pin)
                         .map_err(|e| LoggerError::io(format!("sourcePin serialization: {e}")))?;
@@ -310,10 +337,10 @@ impl Engine {
 
     /// Reattach to an orphaned `recording` roast (CONTRACTS.md §2
     /// `resume_session`). Replay continues the fixture from the last
-    /// persisted seq; a tc4 device reconnects with the stored pin, re-anchors
-    /// the session clock to wall time (the outage stays on the time axis) and
-    /// records the gap. Emits `status: reconnected` first. Returns the seq
-    /// resumed FROM (the last persisted one).
+    /// persisted seq; a device (tc4/modbus) reconnects with the stored pin,
+    /// re-anchors the session clock to wall time (the outage stays on the
+    /// time axis) and records the gap. Emits `status: reconnected` first.
+    /// Returns the seq resumed FROM (the last persisted one).
     pub fn resume_session(&self, roast_uuid: &str, emitter: Emitter) -> Result<u64, LoggerError> {
         let mut active = self.active.lock().unwrap();
         if active.is_some() {
@@ -333,17 +360,17 @@ impl Engine {
                 ),
             ));
         }
-        // tc4 resume: a live device cannot reproduce past samples, so we
-        // reconnect with the stored SourcePin and continue seq from last+1.
-        // Replay resumes losslessly (byte-identical), exactly as before.
-        let is_device_resume = source_id.starts_with("tc4:");
-        let source_pin: Option<SourcePinDto> = if is_device_resume {
+        // Device resume (tc4/modbus): a live device cannot reproduce past
+        // samples, so we reconnect with the stored SourcePin and continue seq
+        // from last+1. Replay resumes losslessly (byte-identical), as before.
+        let is_device_resume = requires_pin(&source_id);
+        let source_pin: Option<serde_json::Value> = if is_device_resume {
             let json = self
                 .store
                 .get_setting(&pin_setting_key(roast_uuid))?
                 .ok_or_else(|| {
                     LoggerError::invalid_args(format!(
-                        "no stored sourcePin for tc4 session {roast_uuid}; cannot resume"
+                        "no stored sourcePin for device session {roast_uuid}; cannot resume"
                     ))
                 })?;
             Some(serde_json::from_str(&json).map_err(|e| {
@@ -365,7 +392,7 @@ impl Engine {
         // for a wall-clock DEVICE the resumed clock re-anchors to
         // started_wall_ms — the outage MUST appear on the time axis, or DROP
         // time, DTR and every post-resume marker understate the real roast.
-        // Session-clock zero ≈ started_wall_ms (the tc4 anchor is set at
+        // Session-clock zero ≈ started_wall_ms (the device anchor is set at
         // thread spawn; boot settle elapses after it), and the .max() guards
         // SystemTime skew so the resumed clock can never regress behind
         // already-persisted samples. Replay keeps last_session_sec: its time
@@ -376,7 +403,8 @@ impl Engine {
             last_session_sec
         };
 
-        // Resuming a tc4 session needs the port back (§7.2 preview rules).
+        // Resuming a tc4 session needs the port back (§7.2 preview rules);
+        // harmless for modbus/replay.
         serial::stop_any_preview();
 
         let mut source = self.build_source(
@@ -811,13 +839,16 @@ mod tests {
         // (including the persisted pin).
         let (_, e2) = collector();
         let args = StartSessionArgs {
-            source_pin: Some(SourcePinDto {
-                source_id: "tc4:/dev/definitely-not-a-port".into(),
-                baud: 115_200,
-                bt_channel: 1,
-                et_channel: Some(2),
-                unit: TempUnitDto::F,
-            }),
+            source_pin: Some(
+                serde_json::to_value(SourcePinDto {
+                    source_id: "tc4:/dev/definitely-not-a-port".into(),
+                    baud: 115_200,
+                    bt_channel: 1,
+                    et_channel: Some(2),
+                    unit: TempUnitDto::F,
+                })
+                .unwrap(),
+            ),
             ..args
         };
         let err = engine.start_session(&args, e2).unwrap_err();
@@ -882,13 +913,16 @@ mod tests {
                 charge_weight_lb: Some(12.0),
                 ..Default::default()
             },
-            source_pin: Some(SourcePinDto {
-                source_id: format!("tc4:{}", emulator.slave_path),
-                baud: 115_200,
-                bt_channel: 1,
-                et_channel: Some(2),
-                unit: TempUnitDto::F,
-            }),
+            source_pin: Some(
+                serde_json::to_value(SourcePinDto {
+                    source_id: format!("tc4:{}", emulator.slave_path),
+                    baud: 115_200,
+                    bt_channel: 1,
+                    et_channel: Some(2),
+                    unit: TempUnitDto::F,
+                })
+                .unwrap(),
+            ),
         };
         let uuid = engine.start_session(&args, emitter).unwrap();
 
@@ -993,13 +1027,16 @@ mod tests {
             source_id: format!("tc4:{}", emulator.slave_path),
             speed: None,
             meta: SessionMetaDto::default(),
-            source_pin: Some(SourcePinDto {
-                source_id: format!("tc4:{}", emulator.slave_path),
-                baud: 115_200,
-                bt_channel: 1,
-                et_channel: Some(2),
-                unit: TempUnitDto::F,
-            }),
+            source_pin: Some(
+                serde_json::to_value(SourcePinDto {
+                    source_id: format!("tc4:{}", emulator.slave_path),
+                    baud: 115_200,
+                    bt_channel: 1,
+                    et_channel: Some(2),
+                    unit: TempUnitDto::F,
+                })
+                .unwrap(),
+            ),
         };
 
         let uuid;
@@ -1153,13 +1190,16 @@ mod tests {
             source_id: format!("tc4:{}", emulator.slave_path),
             speed: None,
             meta: SessionMetaDto::default(),
-            source_pin: Some(SourcePinDto {
-                source_id: format!("tc4:{}", emulator.slave_path),
-                baud: 115_200,
-                bt_channel: 1,
-                et_channel: Some(2),
-                unit: TempUnitDto::F,
-            }),
+            source_pin: Some(
+                serde_json::to_value(SourcePinDto {
+                    source_id: format!("tc4:{}", emulator.slave_path),
+                    baud: 115_200,
+                    bt_channel: 1,
+                    et_channel: Some(2),
+                    unit: TempUnitDto::F,
+                })
+                .unwrap(),
+            ),
         };
 
         let uuid;
@@ -1324,5 +1364,334 @@ mod tests {
         assert_eq!(charge.session_sec, 1.0);
         assert_eq!(charge.note.as_deref(), Some("auto"));
         assert_eq!(roast.summary.markers.charge_temp_f, Some(300.0));
+    }
+
+    // -- modbus (engine-level; the driver-level suite lives in modbus.rs) --
+
+    fn modbus_pin(source_id: &str) -> serde_json::Value {
+        serde_json::json!({
+            "sourceId": source_id,
+            "unitId": 1,
+            "unit": "C",
+            "channels": [
+                { "role": "bt", "register": 0, "kind": "input", "scale": 0.1 },
+                { "role": "et", "register": 1, "kind": "input", "scale": 0.1 },
+            ],
+        })
+    }
+
+    #[test]
+    fn modbus_source_resolution_requires_pin_with_bt_role_then_fails_fast() {
+        let _preview_guard = serial::preview_test_lock();
+        let engine = Engine::new(Store::open(&test_db_path("modbus-resolve")).unwrap());
+
+        // modbus-tcp:<host>:<port> without a sourcePin → invalid_args (§7.2).
+        let (_, e1) = collector();
+        let args = StartSessionArgs {
+            source_id: "modbus-tcp:127.0.0.1:1502".into(),
+            speed: None,
+            meta: SessionMetaDto::default(),
+            source_pin: None,
+        };
+        let err = engine.start_session(&args, e1).unwrap_err();
+        assert_eq!(err.code, crate::error::ErrorCode::InvalidArgs);
+
+        // A pin whose channels lack a bt role → invalid_args too.
+        let (_, e2) = collector();
+        let no_bt = StartSessionArgs {
+            source_pin: Some(serde_json::json!({
+                "sourceId": "modbus-tcp:127.0.0.1:1502",
+                "channels": [{ "role": "et", "register": 1 }],
+            })),
+            ..args.clone()
+        };
+        let err = engine.start_session(&no_bt, e2).unwrap_err();
+        assert_eq!(err.code, crate::error::ErrorCode::InvalidArgs);
+
+        // With a valid pin the factory resolves ModbusSource; connecting to a
+        // port nobody listens on fails fast with port_error and the roast
+        // shell is rolled back (including the persisted pin).
+        let free_port = {
+            let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+            listener.local_addr().unwrap().port()
+        };
+        let source_id = format!("modbus-tcp:127.0.0.1:{free_port}");
+        let (_, e3) = collector();
+        let refused = StartSessionArgs {
+            source_id: source_id.clone(),
+            source_pin: Some(modbus_pin(&source_id)),
+            ..args
+        };
+        let err = engine.start_session(&refused, e3).unwrap_err();
+        assert_eq!(err.code, crate::error::ErrorCode::PortError);
+        assert!(engine.active_roast_uuid().is_none());
+        assert_eq!(
+            engine.store().list_roasts().unwrap().len(),
+            0,
+            "failed start must roll back"
+        );
+    }
+
+    /// The modbus twin of the tc4 definition of done: a full simulated roast
+    /// captured end-to-end through the REAL engine off an in-process
+    /// MODBUS-TCP server — driver → store → events — with auto CHARGE and
+    /// DROP firing, then a clean finish. Platform-independent (no pty).
+    #[test]
+    fn modbus_end_to_end_roast_auto_marks_charge_and_drop_through_the_engine() {
+        use crate::model::TempUnitDto;
+        use modbus::emu::{fast_timing, EmuConfig, Emulator};
+
+        let _preview_guard = serial::preview_test_lock();
+        // A compressed roast in wall-clock seconds: hot soak → charge plunge
+        // → recovery/development → drop plunge → cool. Registers carry °C so
+        // the full unit-conversion path is exercised.
+        let emulator = Emulator::spawn(EmuConfig {
+            curve: vec![
+                (0.0, 390.0),
+                (0.8, 390.0),  // preheat soak
+                (1.6, 170.0),  // charge plunge to the turning point
+                (3.2, 415.0),  // development ramp
+                (4.0, 250.0),  // drop plunge
+                (30.0, 250.0), // cool hold
+            ],
+            unit: TempUnitDto::C,
+            speed: 1.0,
+        });
+
+        let store = Store::open(&test_db_path("modbus-e2e")).unwrap();
+        let mut engine = Engine::new(store);
+        engine.set_modbus_timing(fast_timing());
+
+        let source_id = emulator.source_id();
+        let (collected, emitter) = collector();
+        let args = StartSessionArgs {
+            source_id: source_id.clone(),
+            speed: None,
+            meta: SessionMetaDto {
+                coffee_name: Some("MODBUS Guji".into()),
+                charge_weight_lb: Some(12.0),
+                ..Default::default()
+            },
+            source_pin: Some(modbus_pin(&source_id)),
+        };
+        let uuid = engine.start_session(&args, emitter).unwrap();
+
+        // Wait for both auto markers to land on the stream.
+        let deadline = Instant::now() + Duration::from_secs(15);
+        loop {
+            let markers: Vec<(RoastEventKind, bool)> = collected
+                .lock()
+                .unwrap()
+                .iter()
+                .filter_map(|e| match e {
+                    SampleEvent::Marker { kind, auto, .. } => Some((*kind, *auto)),
+                    _ => None,
+                })
+                .collect();
+            if markers.len() >= 2 {
+                assert_eq!(
+                    markers,
+                    vec![(RoastEventKind::Charge, true), (RoastEventKind::Drop, true)],
+                    "exactly auto CHARGE then auto DROP"
+                );
+                break;
+            }
+            assert!(
+                Instant::now() < deadline,
+                "auto markers never fired: {markers:?}"
+            );
+            std::thread::sleep(Duration::from_millis(10));
+        }
+        engine.stop_if_active(&uuid);
+
+        // Canonical markers persisted via the same path as mark_event.
+        let roast = engine.store().get_roast(&uuid).unwrap();
+        let charge_temp = roast
+            .summary
+            .markers
+            .charge_temp_f
+            .expect("charge temp set");
+        assert!(
+            (charge_temp - 390.0).abs() < 15.0,
+            "charge fired near the soak temp, got {charge_temp}"
+        );
+        let drop_temp = roast.summary.markers.drop_temp_f.expect("drop temp set");
+        assert!(
+            drop_temp > 380.0 && drop_temp <= 416.0,
+            "drop fired near the development peak, got {drop_temp}"
+        );
+        let drop_sec = roast.summary.markers.drop_sec.expect("drop sec set");
+        assert!(drop_sec > 0.0, "drop is after charge on the roast clock");
+        for kind in [RoastEventKind::Charge, RoastEventKind::Drop] {
+            let ev = roast
+                .events
+                .iter()
+                .find(|e| e.kind == kind)
+                .expect("event row");
+            assert_eq!(ev.note.as_deref(), Some("auto"));
+        }
+
+        // Store-before-emit: every emitted sample is already persisted.
+        let emitted = collected
+            .lock()
+            .unwrap()
+            .iter()
+            .filter(|e| matches!(e, SampleEvent::Sample { .. }))
+            .count();
+        assert!(
+            roast.samples.len() >= emitted,
+            "persisted ({}) must never trail emitted ({emitted})",
+            roast.samples.len()
+        );
+
+        // And the roast finishes cleanly.
+        let summary = engine
+            .store()
+            .finish_roast(&uuid, Some(10.4), None)
+            .unwrap();
+        assert_eq!(summary.status, RoastStatus::Finished);
+
+        // READ-ONLY invariant through the whole engine path: the server
+        // audited every request ever received — only FC03/FC04 may appear.
+        let requests = emulator.sent_requests();
+        assert!(!requests.is_empty());
+        for (fc, _, _) in requests {
+            assert!(
+                fc == 3 || fc == 4,
+                "non-read function code on the wire: FC{fc:02}"
+            );
+        }
+    }
+
+    /// modbus resume: reconnect with the stored source_pin, seq continues
+    /// from last+1, and the session clock re-anchors to WALL time — the
+    /// outage while the app was down must appear in session_sec (the same
+    /// honest-clock semantics the tc4 resume test pins down).
+    #[test]
+    fn modbus_resume_reconnects_with_stored_pin_and_continues_seq_and_clock() {
+        use modbus::emu::{fast_timing, EmuConfig, Emulator};
+
+        let _preview_guard = serial::preview_test_lock();
+        // The rig (and the physical roast) outlives the app "crash".
+        let emulator = Emulator::spawn(EmuConfig {
+            curve: vec![(0.0, 390.0)],
+            unit: crate::model::TempUnitDto::C,
+            speed: 1.0,
+        });
+        let source_id = emulator.source_id();
+        let path = test_db_path("modbus-resume");
+        let store = Store::open(&path).unwrap();
+        let args = StartSessionArgs {
+            source_id: source_id.clone(),
+            speed: None,
+            meta: SessionMetaDto::default(),
+            source_pin: Some(modbus_pin(&source_id)),
+        };
+
+        let uuid;
+        {
+            // "Process 1": capture some samples, then die without finishing.
+            let mut engine = Engine::new(store.clone());
+            engine.set_modbus_timing(fast_timing());
+            let (collected, emitter) = collector();
+            uuid = engine.start_session(&args, emitter).unwrap();
+            wait_for_samples(&collected, 5);
+            engine.shutdown();
+        }
+        store.flush().unwrap();
+
+        // The app stays dead for a measurable outage — the physical roast
+        // keeps going, so this time MUST reappear on the session clock.
+        let outage = Duration::from_millis(300);
+        std::thread::sleep(outage);
+
+        // "Process 2": the orphan surfaces and resumes onto the SAME rig.
+        let mut engine = Engine::new(store.clone());
+        engine.set_modbus_timing(fast_timing());
+        let rec = engine
+            .store()
+            .pending_recovery(engine.active_roast_uuid())
+            .unwrap()
+            .expect("orphaned modbus roast must surface");
+        assert_eq!(rec.roast_uuid, uuid);
+        assert!(rec.last_seq >= 5);
+
+        let (collected, emitter) = collector();
+        let wall_before_resume_ms = crate::store::now_ms();
+        let resumed_from = engine.resume_session(&uuid, emitter).unwrap();
+        assert_eq!(resumed_from, rec.last_seq);
+        wait_for_samples(&collected, 3);
+        engine.stop_if_active(&uuid);
+
+        {
+            let events = collected.lock().unwrap();
+            match &events[0] {
+                SampleEvent::Status { kind, .. } => {
+                    assert_eq!(*kind, SourceStatusKind::Reconnected);
+                }
+                other => panic!("first resumed event must be reconnected, got {other:?}"),
+            }
+            // The outage is announced to the live UI right after reconnected.
+            assert!(
+                events.iter().any(|e| matches!(
+                    e,
+                    SampleEvent::Status {
+                        kind: SourceStatusKind::Gap,
+                        ..
+                    }
+                )),
+                "a gap status must follow a device resume"
+            );
+            let first = events
+                .iter()
+                .find_map(|e| match e {
+                    SampleEvent::Sample {
+                        seq, session_sec, ..
+                    } => Some((*seq, *session_sec)),
+                    _ => None,
+                })
+                .unwrap();
+            assert_eq!(
+                first.0,
+                rec.last_seq + 1,
+                "seq continues from last persisted + 1"
+            );
+            // Clock honesty: the first resumed sample carries the FULL wall
+            // elapsed since started_wall_ms — including the outage.
+            let wall_elapsed_sec = (wall_before_resume_ms - rec.started_wall_ms) as f64 / 1000.0;
+            assert!(
+                first.1 >= wall_elapsed_sec - 0.05,
+                "resumed clock must include the outage: got {} < wall elapsed {}",
+                first.1,
+                wall_elapsed_sec
+            );
+            assert!(
+                first.1 >= rec.last_session_sec + outage.as_secs_f64() - 0.05,
+                "resumed clock erased the {}s outage (got {} after {})",
+                outage.as_secs_f64(),
+                first.1,
+                rec.last_session_sec
+            );
+        }
+
+        // The persisted curve is seq-gap-free across the crash boundary, and
+        // the outage is recorded for history as a gap note at the last
+        // pre-crash second.
+        store.flush().unwrap();
+        let roast = store.get_roast(&uuid).unwrap();
+        let mut seqs: Vec<u64> = roast.samples.iter().map(|s| s.seq).collect();
+        seqs.sort_unstable();
+        assert!(
+            seqs.windows(2).all(|w| w[1] == w[0] + 1),
+            "seq contiguous across resume"
+        );
+        assert_eq!(seqs.first(), Some(&1));
+        let note = roast
+            .events
+            .iter()
+            .find(|e| e.kind == RoastEventKind::Note)
+            .expect("resume must persist a gap note event");
+        assert!(note.note.as_deref().unwrap_or("").contains("gap"));
+        assert_eq!(note.session_sec, rec.last_session_sec);
     }
 }
