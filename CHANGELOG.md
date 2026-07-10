@@ -9,9 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 _Next up: Phidgets and MODBUS drivers, code signing + notarization, and a standalone driver SDK (Apache-2.0)._
 
-<!-- RELEASE ENGINEER: stamp the real release date on the [0.1.0] heading below (and the compare links at the bottom) when you tag v0.1.0. -->
 
-## [0.1.0] - YYYY-MM-DD
+## [0.1.0] - 2026-07-10
 
 The first public release. Droptime Logger is a free, local-first, open-source roast logger — a roast **scope and analytics tool, not a controller**. It reads temperatures and never actuates hardware.
 
