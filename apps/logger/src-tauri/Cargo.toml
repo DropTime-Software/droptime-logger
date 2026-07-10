@@ -27,11 +27,18 @@ tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 serialport = "4"
 py_literal = "0.4"
 ureq = { version = "2", features = ["json"] }
+# MODBUS-TCP client for capture/modbus.rs (client-only: no server, no RTU).
+tokio-modbus = { version = "0.17.0", default-features = false, features = ["tcp"] }
+# Contained inside the modbus source thread (current-thread runtime); the
+# capture engine itself stays synchronous. Keep the feature set minimal.
+tokio = { version = "1.52.3", default-features = false, features = ["rt", "net", "time"] }
 
 [dev-dependencies]
 # pty for the TC4 emulator example (openpty lives behind the `term` feature;
 # `fs` adds fcntl for the emulator's non-blocking master reads).
 nix = { version = "0.30", features = ["term", "fs"] }
+# In-process MODBUS-TCP server for the modbus tests + modbus_emulator example.
+tokio-modbus = { version = "0.17.0", default-features = false, features = ["tcp", "tcp-server"] }
 
 [profile.dev]
 incremental = true
