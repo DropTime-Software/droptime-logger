@@ -15,3 +15,6 @@ target/
 
 # OS cruft
 .DS_Store
+
+# Tauri codegen (regenerated at build)
+apps/logger/src-tauri/gen/
