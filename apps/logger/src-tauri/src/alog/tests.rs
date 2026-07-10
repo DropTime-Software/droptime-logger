@@ -238,7 +238,7 @@ fn rebase_shifts_first_sample_to_zero_and_pins_charge() {
 #[test]
 fn preview_markers_match_the_committed_roast() {
     let path = write_file("guji.alog", CLEAN_ALOG);
-    let previews = super::preview(&[path.clone()]).unwrap();
+    let previews = super::preview(std::slice::from_ref(&path)).unwrap();
     let preview = &previews[0];
     assert!(preview.ok);
     assert_eq!(preview.sample_count, Some(12));
