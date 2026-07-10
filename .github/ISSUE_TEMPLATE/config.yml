@@ -1,8 +1,8 @@
 blank_issues_enabled: false
 contact_links:
   - name: Questions & discussion
-    url: https://github.com/OutsideTheBoxDev/droptime-logger/discussions
+    url: https://github.com/DropTime-Software/droptime-logger/discussions
     about: Setup help, roasting workflow questions, and ideas that aren't a bug report yet — start a discussion.
   - name: Security & privacy
-    url: https://github.com/OutsideTheBoxDev/droptime-logger/blob/main/SECURITY.md
+    url: https://github.com/DropTime-Software/droptime-logger/blob/main/SECURITY.md
     about: Found a vulnerability? Please report it privately. See our security policy.

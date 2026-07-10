@@ -6,8 +6,8 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/OutsideTheBoxDev/droptime-logger/actions/workflows/ci.yml"><img src="https://github.com/OutsideTheBoxDev/droptime-logger/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
-  <a href="https://github.com/OutsideTheBoxDev/droptime-logger/releases/latest"><img src="https://img.shields.io/github/v/release/OutsideTheBoxDev/droptime-logger?display_name=tag&sort=semver" alt="Latest release"></a>
+  <a href="https://github.com/DropTime-Software/droptime-logger/actions/workflows/ci.yml"><img src="https://github.com/DropTime-Software/droptime-logger/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
+  <a href="https://github.com/DropTime-Software/droptime-logger/releases/latest"><img src="https://img.shields.io/github/v/release/DropTime-Software/droptime-logger?display_name=tag&sort=semver" alt="Latest release"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-AGPL--3.0-blue.svg" alt="License: AGPL-3.0"></a>
   <a href="CONTRIBUTING.md"><img src="https://img.shields.io/badge/PRs-welcome-brightgreen.svg" alt="PRs welcome"></a>
 </p>
@@ -55,11 +55,11 @@ We would rather tell you the truth than pad a compatibility list. Here is exactl
 | MODBUS (Loring / Giesen / Probat-class) | 🛠️ v0.2 | On the roadmap. |
 | Aillio Bullet R2, Kaleido | 🔬 Investigating | Clean-room only. **Device reports welcome** — see below. |
 
-**Own a machine we don't support yet?** Ten minutes of your time gets your rig on the roadmap. Open a [device report](https://github.com/OutsideTheBoxDev/droptime-logger/issues/new?template=device-report.yml) — the in-app sniffer has a **Copy diagnostic** button that pastes your port, frame dump, and hardware details straight into it.
+**Own a machine we don't support yet?** Ten minutes of your time gets your rig on the roadmap. Open a [device report](https://github.com/DropTime-Software/droptime-logger/issues/new?template=device-report.yml) — the in-app sniffer has a **Copy diagnostic** button that pastes your port, frame dump, and hardware details straight into it.
 
 ## Install
 
-Download the latest build for your platform from the [Releases page](https://github.com/OutsideTheBoxDev/droptime-logger/releases).
+Download the latest build for your platform from the [Releases page](https://github.com/DropTime-Software/droptime-logger/releases).
 
 ### macOS
 
@@ -120,7 +120,7 @@ Full details, the sanctioned-inputs list, and the provenance checklist live in [
 
 ## Community
 
-Questions, roasts, and feature ideas belong in [GitHub Discussions](https://github.com/OutsideTheBoxDev/droptime-logger/discussions). Bugs and device reports go through the [issue templates](https://github.com/OutsideTheBoxDev/droptime-logger/issues/new/choose).
+Questions, roasts, and feature ideas belong in [GitHub Discussions](https://github.com/DropTime-Software/droptime-logger/discussions). Bugs and device reports go through the [issue templates](https://github.com/DropTime-Software/droptime-logger/issues/new/choose).
 
 ## License
 

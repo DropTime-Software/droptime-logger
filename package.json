@@ -5,10 +5,10 @@
   "description": "A beautiful, local-first roast logger. Free forever, open source, and your data never leaves your machine unless you say so.",
   "license": "AGPL-3.0-only",
   "author": "Ryan Luttrell <ryan@outsidethebox.dev>",
-  "homepage": "https://github.com/OutsideTheBoxDev/droptime-logger",
+  "homepage": "https://github.com/DropTime-Software/droptime-logger",
   "repository": {
     "type": "git",
-    "url": "https://github.com/OutsideTheBoxDev/droptime-logger.git"
+    "url": "https://github.com/DropTime-Software/droptime-logger.git"
   },
   "engines": {
     "node": ">=20",

@@ -103,4 +103,4 @@ The setup wizard's hardware sniffer confirms a TC4 rig by behavior, not by VID/P
 2. Send `READ` (read-only) and listen ~3 seconds.
 3. **Verdict `tc4`:** a line of 3–7 comma-separated decimals whose first field is a plausible ambient temperature.
 4. **Verdict `silent`:** the port opened but nothing numeric came back (wrong baud, not a TC4, or still booting).
-5. **Verdict `unknown`:** traffic arrived but didn't match the signature — worth a [device report](https://github.com/OutsideTheBoxDev/droptime-logger/issues/new?template=device-report.yml); the sniffer's diagnostic block (port, VID/PID, baud, raw frames) is built to be pasted into one.
+5. **Verdict `unknown`:** traffic arrived but didn't match the signature — worth a [device report](https://github.com/DropTime-Software/droptime-logger/issues/new?template=device-report.yml); the sniffer's diagnostic block (port, VID/PID, baud, raw frames) is built to be pasted into one.

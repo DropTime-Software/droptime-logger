@@ -67,5 +67,5 @@ The first public release. Droptime Logger is a free, local-first, open-source ro
 - The update check is notice-only; there is no automatic in-app update.
 - Linux support is experimental and best-effort, not a supported tier.
 
-[Unreleased]: https://github.com/OutsideTheBoxDev/droptime-logger/compare/v0.1.0...HEAD
-[0.1.0]: https://github.com/OutsideTheBoxDev/droptime-logger/releases/tag/v0.1.0
+[Unreleased]: https://github.com/DropTime-Software/droptime-logger/compare/v0.1.0...HEAD
+[0.1.0]: https://github.com/DropTime-Software/droptime-logger/releases/tag/v0.1.0

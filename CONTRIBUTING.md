@@ -2,7 +2,7 @@
 
 Thanks for being here. Droptime Logger is built by people who care about roasting coffee well and about software that respects the people using it. Contributions of every size are welcome — from a typo fix to a new driver — and a few kinds of help matter more than you might think:
 
-- **Device reports — the single most valuable contribution.** Own a machine we don't support? Ten minutes of your time gets your rig on the roadmap. Open a [device report](https://github.com/OutsideTheBoxDev/droptime-logger/issues/new?template=device-report.yml) — the in-app hardware sniffer has a "copy diagnostic" button that produces a block you can paste straight into the template.
+- **Device reports — the single most valuable contribution.** Own a machine we don't support? Ten minutes of your time gets your rig on the roadmap. Open a [device report](https://github.com/DropTime-Software/droptime-logger/issues/new?template=device-report.yml) — the in-app hardware sniffer has a "copy diagnostic" button that produces a block you can paste straight into the template.
 - **Drivers** for new machines and probes (read the [clean-room policy](#the-clean-room-policy) first — it is strict, and it is how we keep this project shippable).
 - **Fixtures** — interesting roast profiles, weird serial frames, edge-case `.alog` files you generated from your own history. Real-world data makes the math honest.
 - **Docs** — setup guides, probe-placement notes, protocol documentation in `docs/protocols/`.

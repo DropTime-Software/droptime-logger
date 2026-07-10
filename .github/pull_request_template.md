@@ -21,8 +21,8 @@
 
 - [ ] `pnpm test` and `cargo test` pass locally.
 - [ ] `cargo fmt` and `cargo clippy` are clean; `tsc` and lint pass.
-- [ ] I've read the [Contributing guide](https://github.com/OutsideTheBoxDev/droptime-logger/blob/main/CONTRIBUTING.md).
+- [ ] I've read the [Contributing guide](https://github.com/DropTime-Software/droptime-logger/blob/main/CONTRIBUTING.md).
 
 ---
 
-By opening this PR you'll be asked to sign the [CLA](https://github.com/OutsideTheBoxDev/droptime-logger/blob/main/CLA.md) — a one-time comment on your first contribution. It lets Droptime include your work in both the open-source Logger and Droptime's commercial products, while you keep your own copyright. The CLA bot posts the details automatically.
+By opening this PR you'll be asked to sign the [CLA](https://github.com/DropTime-Software/droptime-logger/blob/main/CLA.md) — a one-time comment on your first contribution. It lets Droptime include your work in both the open-source Logger and Droptime's commercial products, while you keep your own copyright. The CLA bot posts the details automatically.
