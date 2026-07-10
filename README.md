@@ -65,12 +65,6 @@ Download the latest build for your platform from the [Releases page](https://git
 
 Grab the `.dmg` (Apple Silicon or Intel). v0.1.0 is **not yet notarized**, so the first launch needs one extra step: **right-click the app → Open → Open**. You only do this once. Code signing and notarization land in v0.1.1.
 
-<p align="center">
-  <img src="docs/media/macos-open.png" alt="macOS right-click Open dialog for a first launch" width="440">
-</p>
-
-<!-- RELEASE ENGINEER: capture the macOS "unidentified developer -> Open" dialog and save it at docs/media/macos-open.png. Remove this note and the placeholder once notarization ships in v0.1.1. -->
-
 ### Windows
 
 Grab the `.exe` (NSIS) installer. Because the build is unsigned for now, SmartScreen may warn you: click **More info → Run anyway**. Code signing is planned.
