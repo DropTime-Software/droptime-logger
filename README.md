@@ -63,7 +63,7 @@ Download the latest build for your platform from the [Releases page](https://git
 
 ### macOS
 
-Grab the `.dmg` (Apple Silicon or Intel). v0.1.0 is **not yet notarized**, so the first launch needs one extra step: **right-click the app → Open → Open**. You only do this once. Code signing and notarization land in v0.1.1.
+Grab the `.dmg` (Apple Silicon or Intel). Builds are **signed and notarized by Apple** — download, drag to Applications, open. No warnings, no workarounds.
 
 ### Windows
 

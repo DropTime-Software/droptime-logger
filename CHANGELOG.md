@@ -10,6 +10,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 _Next up: Phidgets and MODBUS drivers, code signing + notarization, and a standalone driver SDK (Apache-2.0)._
 
 
+## [0.1.1] - 2026-07-10
+
+### Changed
+
+- macOS builds are now code-signed and notarized by Apple. The right-click-to-open
+  workaround is no longer needed; download, drag to Applications, and open.
+
 ## [0.1.0] - 2026-07-10
 
 The first public release. Droptime Logger is a free, local-first, open-source roast logger — a roast **scope and analytics tool, not a controller**. It reads temperatures and never actuates hardware.
@@ -67,5 +74,6 @@ The first public release. Droptime Logger is a free, local-first, open-source ro
 - The update check is notice-only; there is no automatic in-app update.
 - Linux support is experimental and best-effort, not a supported tier.
 
-[Unreleased]: https://github.com/DropTime-Software/droptime-logger/compare/v0.1.0...HEAD
+[Unreleased]: https://github.com/DropTime-Software/droptime-logger/compare/v0.1.1...HEAD
+[0.1.1]: https://github.com/DropTime-Software/droptime-logger/compare/v0.1.0...v0.1.1
 [0.1.0]: https://github.com/DropTime-Software/droptime-logger/releases/tag/v0.1.0

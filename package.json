@@ -1,6 +1,6 @@
 {
   "name": "droptime-logger",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "private": true,
   "description": "A beautiful, local-first roast logger. Free forever, open source, and your data never leaves your machine unless you say so.",
   "license": "AGPL-3.0-only",
