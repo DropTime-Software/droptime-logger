@@ -302,7 +302,7 @@ fn sniff_with_stop(
                                 .filter(|(_, v)| **v != 0.0)
                                 .map(|(i, _)| i as u32 + 1)
                                 .collect();
-                            if channels.as_ref().map_or(true, |c| seen.len() > c.len()) {
+                            if channels.as_ref().is_none_or(|c| seen.len() > c.len()) {
                                 *channels = Some(seen);
                             }
                         }
