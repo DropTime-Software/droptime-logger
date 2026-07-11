@@ -376,3 +376,10 @@ pub async fn cloud_fetch(
 ) -> Result<crate::cloud::CloudFetchResp, LoggerError> {
     crate::cloud::fetch(req)
 }
+
+/// Clear the proxy's stored Clerk cookies (called on sign-out).
+#[tauri::command]
+pub async fn cloud_clear_session() -> Result<(), LoggerError> {
+    crate::cloud::clear_cookies();
+    Ok(())
+}

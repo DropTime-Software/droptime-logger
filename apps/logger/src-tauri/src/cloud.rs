@@ -20,13 +20,62 @@
 //!    no http capability, and no CSP change. (Convex's own WebSocket is direct
 //!    from the webview and needs only a CSP `connect-src`.)
 
+use std::collections::HashMap;
 use std::io::{Read, Write};
 use std::net::TcpListener;
+use std::sync::{Mutex, OnceLock};
 
 use serde::{Deserialize, Serialize};
 use tauri::{AppHandle, Emitter};
 
 use crate::error::LoggerError;
+
+// ---------------------------------------------------------------------------
+// Cookie jar for the Clerk FAPI proxy
+// ---------------------------------------------------------------------------
+//
+// clerk-js authenticates FAPI in "standard browser" mode via the `__client`
+// cookie on clerk.trydroptime.com. The Tauri webview can't carry that cookie
+// through the Rust proxy (we reconstruct Responses, so Set-Cookie never reaches
+// the webview jar, and re-issuing from Rust drops the request cookies). So the
+// proxy IS the cookie jar: it captures Set-Cookie from Clerk's responses and
+// replays them on later requests — the whole reason getToken() authenticates.
+// Rust sees httpOnly cookies that JS can't, which is exactly what's needed.
+
+fn cookie_jar() -> &'static Mutex<HashMap<String, String>> {
+    static JAR: OnceLock<Mutex<HashMap<String, String>>> = OnceLock::new();
+    JAR.get_or_init(|| Mutex::new(HashMap::new()))
+}
+
+/// `name=value; …attrs` → store name→value (empty value = delete).
+fn store_cookie(set_cookie: &str) {
+    let first = set_cookie.split(';').next().unwrap_or("").trim();
+    if let Some((name, value)) = first.split_once('=') {
+        let (name, value) = (name.trim().to_string(), value.trim().to_string());
+        if name.is_empty() {
+            return;
+        }
+        let mut jar = cookie_jar().lock().unwrap();
+        if value.is_empty() {
+            jar.remove(&name);
+        } else {
+            jar.insert(name, value);
+        }
+    }
+}
+
+fn jar_cookie_header() -> String {
+    let jar = cookie_jar().lock().unwrap();
+    jar.iter()
+        .map(|(k, v)| format!("{k}={v}"))
+        .collect::<Vec<_>>()
+        .join("; ")
+}
+
+/// Drop the stored Clerk cookies (called on sign-out).
+pub fn clear_cookies() {
+    cookie_jar().lock().unwrap().clear();
+}
 
 // ---------------------------------------------------------------------------
 // Loopback OAuth listener
@@ -164,13 +213,26 @@ pub fn fetch(req: CloudFetchReq) -> Result<CloudFetchResp, LoggerError> {
         )));
     }
     let mut request = ureq::request(&req.method, &req.url);
+    let mut has_cookie = false;
     for (k, v) in &req.headers {
-        // Never forward Origin — the whole point of the proxy.
+        // Never forward Origin (the whole point of the proxy — Clerk rejects
+        // Origin+Authorization together and would CSRF-check a tauri:// origin).
         if k.eq_ignore_ascii_case("origin") || k.eq_ignore_ascii_case("host") {
             continue;
         }
+        if k.eq_ignore_ascii_case("cookie") {
+            has_cookie = true;
+        }
         request = request.set(k, v);
     }
+    // Replay the stored Clerk cookies so the FAPI call is authenticated.
+    if !has_cookie {
+        let cookie_header = jar_cookie_header();
+        if !cookie_header.is_empty() {
+            request = request.set("Cookie", &cookie_header);
+        }
+    }
+
     let result = match req.body {
         Some(body) => request.send_string(&body),
         None => request.call(),
@@ -182,10 +244,18 @@ pub fn fetch(req: CloudFetchReq) -> Result<CloudFetchResp, LoggerError> {
             return Err(LoggerError::io(format!("cloud_fetch transport: {t}")))
         }
     };
+
     let status = resp.status();
+    // Capture Set-Cookie into the jar (must read before into_string consumes it).
+    for set_cookie in resp.all("set-cookie") {
+        store_cookie(set_cookie);
+    }
+    // Forward every response header EXCEPT set-cookie (the webview can't apply
+    // it and Headers would choke) — the jar owns cookies now.
     let headers = resp
         .headers_names()
         .into_iter()
+        .filter(|name| !name.eq_ignore_ascii_case("set-cookie"))
         .filter_map(|name| resp.header(&name).map(|v| (name.clone(), v.to_string())))
         .collect();
     let body = resp

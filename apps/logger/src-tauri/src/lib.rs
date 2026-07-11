@@ -95,6 +95,7 @@ pub fn run() {
             ipc::sync_mark_synced,
             ipc::oauth_start,
             ipc::cloud_fetch,
+            ipc::cloud_clear_session,
         ])
         .build(tauri::generate_context!())
         .expect("error while building droptime-logger")
