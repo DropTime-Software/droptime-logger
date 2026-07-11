@@ -38,6 +38,8 @@ export class CloudSession {
   private clerk: Clerk | null = null;
   private convex: ConvexClient | null = null;
   private ready = false;
+  private authed = false;
+  private authWaiters: Array<(v: boolean) => void> = [];
 
   /** Load clerk-js (restoring any persisted session) and wire the Convex auth. */
   async init(): Promise<CloudAuthState> {
@@ -51,18 +53,59 @@ export class CloudSession {
     return this.state();
   }
 
-  /** Point the Convex client at the current Clerk `convex`-template token. */
+  /**
+   * Point the Convex client at the current Clerk `convex`-template token. The
+   * `onChange` callback tracks when the Convex connection is ACTUALLY
+   * authenticated (a server round-trip after setAuth) — the flusher waits on
+   * this so mutations never race ahead of auth and hit UNAUTHENTICATED.
+   */
   private wireConvexAuth(): void {
     const clerk = this.clerk;
-    this.convex?.setAuth(async ({ forceRefreshToken }: { forceRefreshToken: boolean }) => {
-      try {
-        return (
-          (await clerk?.session?.getToken({ template: 'convex', skipCache: forceRefreshToken })) ??
-          null
-        );
-      } catch {
-        return null;
-      }
+    this.convex?.setAuth(
+      async ({ forceRefreshToken }: { forceRefreshToken: boolean }) => {
+        try {
+          return (
+            (await clerk?.session?.getToken({
+              template: 'convex',
+              skipCache: forceRefreshToken,
+            })) ?? null
+          );
+        } catch {
+          return null;
+        }
+      },
+      (isAuthenticated: boolean) => {
+        this.authed = isAuthenticated;
+        if (isAuthenticated) {
+          const waiters = this.authWaiters;
+          this.authWaiters = [];
+          waiters.forEach((w) => w(true));
+        }
+      },
+    );
+  }
+
+  /** Whether the Convex connection is currently authenticated. */
+  isAuthed(): boolean {
+    return this.authed;
+  }
+
+  /**
+   * Resolve once the Convex connection is authenticated, or `false` on timeout
+   * (e.g. the `convex` JWT template is missing or the token can't be minted).
+   * Callers should NOT flush when this returns false.
+   */
+  async waitForAuth(timeoutMs = 20_000): Promise<boolean> {
+    if (this.authed) return true;
+    if (this.state().status !== 'signed-in') return false;
+    return new Promise<boolean>((resolve) => {
+      const onResolve = (v: boolean) => {
+        clearTimeout(timer);
+        this.authWaiters = this.authWaiters.filter((w) => w !== onResolve);
+        resolve(v);
+      };
+      const timer = setTimeout(() => onResolve(false), timeoutMs);
+      this.authWaiters.push(onResolve);
     });
   }
 
