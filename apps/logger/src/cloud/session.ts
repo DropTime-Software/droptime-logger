@@ -45,7 +45,11 @@ export class CloudSession {
     if (this.ready) return this.state();
     installClerkFetchProxy();
     this.clerk = new Clerk(CLERK_PUBLISHABLE_KEY);
-    await this.clerk.load({});
+    // Native mode: clerk-js authenticates FAPI with an Authorization header +
+    // in-memory client token instead of cookies. The Tauri webview can't carry
+    // clerk.trydroptime.com cookies through the Rust fetch-proxy, so standard
+    // (cookie) mode leaves getToken() unauthenticated → null. (build plan §9)
+    await this.clerk.load({ standardBrowser: false });
     this.convex = new ConvexHttpClient(CONVEX_URL);
     this.ready = true;
     return this.state();
