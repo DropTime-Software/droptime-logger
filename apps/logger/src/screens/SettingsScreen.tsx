@@ -9,6 +9,7 @@ import { ArrowSquareOut } from '@phosphor-icons/react';
 import type { AppMode, AppInfo } from '../bridge';
 import { ipc } from '../bridge';
 import { useSession } from '../state/SessionProvider';
+import { useCloud } from '../state/CloudProvider';
 import { useSettings } from '../settings/SettingsProvider';
 import { Button } from '../components/ui';
 import { Section, SegmentedToggle, SettingRow, Toggle } from '../features/appShell/controls';
@@ -213,9 +214,65 @@ export function SettingsScreen({ mode }: { mode: AppMode }) {
   );
 }
 
+const lemonBtn =
+  'dt-focus-ring inline-flex items-center gap-1.5 rounded-lg bg-lemon px-4 py-2 text-sm font-semibold text-forest transition-colors hover:bg-cream disabled:opacity-60';
+const ghostBtn =
+  'dt-focus-ring inline-flex items-center gap-1.5 rounded-lg border border-cream/25 px-3 py-2 text-sm font-medium text-cream/80 transition-colors hover:bg-cream/10';
+
+function gateNudge(gate?: string, cap?: string): { text: string; action?: string } | null {
+  if (gate === 'onboarding')
+    return { text: 'Finish setting up your roastery in Droptime to start syncing.', action: 'Open Droptime' };
+  if (gate === 'paywall')
+    return { text: 'Your Droptime billing needs attention before syncing.', action: 'Open Droptime' };
+  if (gate === 'unauthenticated') return { text: 'Your session expired — sign in again.' };
+  if (cap === 'machine-limit')
+    return { text: 'The free plan syncs one machine. Upgrade to sync more.', action: 'Upgrade' };
+  if (cap === 'roast-monthly-limit')
+    return { text: "You've hit the free plan's monthly roast limit. Upgrade for unlimited.", action: 'Upgrade' };
+  return null;
+}
+
 function CloudPane({ mode }: { mode: AppMode }) {
+  const { status, auth, sync, busy, signIn, signOut, syncNow } = useCloud();
+  const shell =
+    'mt-1 overflow-hidden rounded-2xl bg-pine text-cream shadow-xl';
+
+  // Browser/demo or a build without a Convex URL — keep the calm marketing card.
+  if (status === 'disabled') {
+    return (
+      <section className={shell}>
+        <div className="relative p-6 sm:p-7">
+          <div
+            aria-hidden
+            className="pointer-events-none absolute -right-10 -top-10 h-40 w-40 rounded-full"
+            style={{ background: 'radial-gradient(circle, rgba(218,246,152,0.22), transparent 70%)' }}
+          />
+          <div className="relative">
+            <span className="rounded-full bg-lemon/20 px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-[0.14em] text-lemon">
+              Desktop app
+            </span>
+            <h2 className="mt-3 text-xl font-bold tracking-[-0.04em] text-cream">
+              Droptime Cloud<span className="text-lemon">.</span>
+            </h2>
+            <p className="mt-2 max-w-lg text-sm leading-relaxed text-cream/70">
+              Sign in from the desktop app to sync your roast history, get AI roast readouts, and
+              share with your team. The logger stays free and local-first, forever.
+            </p>
+            <div className="mt-4">
+              <button type="button" onClick={() => void openExternal(mode, CLOUD_URL)} className={lemonBtn}>
+                Learn more <ArrowSquareOut size={15} weight="bold" />
+              </button>
+            </div>
+          </div>
+        </div>
+      </section>
+    );
+  }
+
+  const nudge = gateNudge(sync.gate, sync.cap);
+
   return (
-    <section className="mt-1 overflow-hidden rounded-2xl bg-pine text-cream shadow-xl">
+    <section className={shell}>
       <div className="relative p-6 sm:p-7">
         <div
           aria-hidden
@@ -223,27 +280,80 @@ function CloudPane({ mode }: { mode: AppMode }) {
           style={{ background: 'radial-gradient(circle, rgba(218,246,152,0.22), transparent 70%)' }}
         />
         <div className="relative">
-          <div className="flex items-center gap-2">
-            <span className="rounded-full bg-lemon/20 px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-[0.14em] text-lemon">
-              Coming soon
-            </span>
-          </div>
-          <h2 className="mt-3 text-xl font-bold tracking-[-0.04em] text-cream">
+          <h2 className="text-xl font-bold tracking-[-0.04em] text-cream">
             Droptime Cloud<span className="text-lemon">.</span>
           </h2>
-          <p className="mt-2 max-w-lg text-sm leading-relaxed text-cream/70">
-            Sync your roast history, get AI roast readouts, and share with your team. Coming soon.
-            The logger stays free and local-first, forever.
-          </p>
-          <div className="mt-4">
-            <button
-              type="button"
-              onClick={() => void openExternal(mode, CLOUD_URL)}
-              className="dt-focus-ring inline-flex items-center gap-1.5 rounded-lg bg-lemon px-4 py-2 text-sm font-semibold text-forest transition-colors hover:bg-cream"
-            >
-              Learn more <ArrowSquareOut size={15} weight="bold" />
-            </button>
-          </div>
+
+          {status === 'signed-out' ? (
+            <>
+              <p className="mt-2 max-w-lg text-sm leading-relaxed text-cream/70">
+                Sync your roast history to Droptime, get AI roast readouts, and share with your
+                team. Free while you&apos;re on the free plan.
+              </p>
+              <div className="mt-4 flex items-center gap-3">
+                <button type="button" onClick={() => void signIn()} disabled={busy} className={lemonBtn}>
+                  {busy ? 'Opening browser…' : 'Sign in to sync'}
+                </button>
+                {sync.pending > 0 && (
+                  <span className="text-sm text-cream/60">
+                    {sync.pending} roast{sync.pending === 1 ? '' : 's'} waiting to sync
+                  </span>
+                )}
+              </div>
+            </>
+          ) : (
+            <>
+              <div className="mt-3 flex items-center justify-between gap-3">
+                <div className="min-w-0">
+                  <div className="truncate text-sm font-semibold text-cream">
+                    {auth.email ?? 'Signed in'}
+                  </div>
+                  {auth.orgName && (
+                    <div className="truncate text-xs text-cream/55">{auth.orgName}</div>
+                  )}
+                </div>
+                <button type="button" onClick={() => void signOut()} disabled={busy} className={ghostBtn}>
+                  Sign out
+                </button>
+              </div>
+
+              <div className="mt-4 flex items-center gap-3">
+                <button
+                  type="button"
+                  onClick={() => void syncNow()}
+                  disabled={sync.syncing}
+                  className={lemonBtn}
+                >
+                  {sync.syncing ? 'Syncing…' : 'Sync now'}
+                </button>
+                <span className="text-sm text-cream/60">
+                  {sync.syncing
+                    ? 'Uploading roasts…'
+                    : sync.pending > 0
+                      ? `${sync.pending} roast${sync.pending === 1 ? '' : 's'} to sync`
+                      : 'All roasts synced'}
+                </span>
+              </div>
+
+              {nudge && (
+                <div className="mt-4 rounded-lg bg-lemon/10 p-3 text-sm text-cream/80">
+                  {nudge.text}
+                  {nudge.action && (
+                    <button
+                      type="button"
+                      onClick={() => void openExternal(mode, CLOUD_URL)}
+                      className="ml-1 font-semibold text-lemon underline underline-offset-2"
+                    >
+                      {nudge.action}
+                    </button>
+                  )}
+                </div>
+              )}
+              {!nudge && sync.lastError && (
+                <p className="mt-3 text-xs text-coral/90">Sync paused: {sync.lastError}</p>
+              )}
+            </>
+          )}
         </div>
       </div>
     </section>

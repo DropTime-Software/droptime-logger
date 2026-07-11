@@ -1,6 +1,6 @@
 [package]
 name = "droptime-logger"
-version = "0.1.2"
+version = "0.2.0"
 description = "Droptime Logger — free desktop roast logger"
 edition = "2021"
 rust-version = "1.82"

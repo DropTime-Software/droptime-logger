@@ -7,7 +7,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-_Next up: Phidgets and MODBUS drivers, code signing + notarization, and a standalone driver SDK (Apache-2.0)._
+_Next up: Phidgets and MODBUS drivers, and a standalone driver SDK (Apache-2.0)._
+
+
+## [0.2.0] - 2026-07-12
+
+### Added
+
+- **Droptime Cloud sync (beta).** Sign in from the desktop app to sync your roast
+  history to your Droptime account, where every synced roast gets an AI readout
+  and is visible to your team. Sign-in opens your system browser — no password
+  lives in the app. The logger stays free and fully local-first: signed-out is a
+  normal state, and nothing leaves your machine until you ask it to.
+  - A durable local outbox syncs roasts logged offline automatically once you're
+    back online. Your local history is the source of truth; the cloud is a mirror.
+  - Available in builds configured with a Droptime Convex deployment URL
+    (`VITE_CONVEX_URL`); otherwise the Cloud pane invites you to learn more and
+    the app is unaffected.
 
 
 ## [0.1.2] - 2026-07-11
@@ -81,7 +97,8 @@ The first public release. Droptime Logger is a free, local-first, open-source ro
 - The update check is notice-only; there is no automatic in-app update.
 - Linux support is experimental and best-effort, not a supported tier.
 
-[Unreleased]: https://github.com/DropTime-Software/droptime-logger/compare/v0.1.2...HEAD
+[Unreleased]: https://github.com/DropTime-Software/droptime-logger/compare/v0.2.0...HEAD
+[0.2.0]: https://github.com/DropTime-Software/droptime-logger/compare/v0.1.2...v0.2.0
 [0.1.2]: https://github.com/DropTime-Software/droptime-logger/compare/v0.1.1...v0.1.2
 [0.1.1]: https://github.com/DropTime-Software/droptime-logger/compare/v0.1.0...v0.1.1
 [0.1.0]: https://github.com/DropTime-Software/droptime-logger/releases/tag/v0.1.0

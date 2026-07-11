@@ -306,3 +306,57 @@ export interface LoggerError {
 }
 
 export type { SourceInfo };
+
+// ---------------------------------------------------------------------------
+// Cloud sync (Droptime Cloud — store/sync.rs). The webview drainer maps these
+// onto the convex/logger.ts mutation family.
+// ---------------------------------------------------------------------------
+
+/** One Cloud `CurvePoint` (convex/roasts.ts `curvePoint`); `t` seconds-from-charge, temps °F. */
+export interface CurvePoint {
+  t: number;
+  bt: number;
+  et?: number;
+  ror?: number;
+  burner?: number;
+  airflow?: number;
+  drum?: number;
+}
+
+/** A pending roast assembled by `store/sync.rs` for the Cloud `logger.*` mutations. */
+export interface SyncRoast {
+  outboxId: number;
+  op: 'finalize' | 'import' | (string & {});
+  clientRoastId: string;
+  deviceId: string;
+  clientMachineId: string;
+  machineName: string;
+  machineMake?: string;
+  coffeeName?: string;
+  startedWallMs: number;
+  chargeWeightLb: number;
+  dropWeightLb?: number;
+  // flattened canonical markers (seconds-from-charge; temps °F)
+  chargeTempF?: number;
+  turningPointSec?: number;
+  turningPointTempF?: number;
+  dryEndSec?: number;
+  fcStartSec?: number;
+  fcEndSec?: number;
+  dropSec?: number;
+  dropTempF?: number;
+  curve: CurvePoint[];
+}
+
+/** Ack payload for `sync_mark_synced` — stamps outbox.synced_ms + roasts.synced_batch_id. */
+export interface MarkSyncedArg {
+  outboxId: number;
+  clientRoastId: string;
+  batchId: string;
+}
+
+/** Loopback OAuth callback payload the Rust one-shot listener emits to the webview. */
+export interface OAuthCallback {
+  token: string;
+  state: string;
+}

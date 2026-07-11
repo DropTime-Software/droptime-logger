@@ -11,6 +11,7 @@ mod imports;
 mod library;
 mod ops;
 mod schema;
+mod sync;
 
 use std::path::Path;
 use std::sync::mpsc;
@@ -26,6 +27,7 @@ use crate::model::{
 };
 
 pub use ops::{now_ms, speed_setting_key, ResumeSeed};
+pub use sync::{MarkSyncedArg, SyncRoastDto};
 
 /// How long a sample batch transaction stays open before committing.
 const BATCH_FLUSH_INTERVAL: Duration = Duration::from_secs(1);
