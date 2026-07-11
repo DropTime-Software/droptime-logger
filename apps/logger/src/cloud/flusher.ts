@@ -10,7 +10,7 @@
  * time, and stop on the first gate/cap/transport error — leaving that row (and
  * everything after it) pending for the next pass.
  */
-import type { ConvexClient } from 'convex/browser';
+import type { ConvexHttpClient } from 'convex/browser';
 
 import { ipc } from '../bridge';
 import type { SyncRoast } from '../bridge/dto';
@@ -48,11 +48,11 @@ function classify(err: unknown): { gate?: Gate; cap?: Cap; message: string } {
 }
 
 /** Replay ONE roast; returns the created batch id. Throws typed server errors. */
-async function syncOne(client: ConvexClient, r: SyncRoast): Promise<string> {
-  await client.mutation(fns.upsertMachine, upsertMachineArgs(r));
+async function syncOne(http: ConvexHttpClient, r: SyncRoast): Promise<string> {
+  await http.mutation(fns.upsertMachine, upsertMachineArgs(r));
 
   if (r.op === 'import') {
-    const results = (await client.mutation(fns.importLocalHistory, {
+    const results = (await http.mutation(fns.importLocalHistory, {
       roasts: [importRow(r)],
     })) as Array<{ batchId: string }>;
     return results[0]?.batchId ?? '';
@@ -61,9 +61,9 @@ async function syncOne(client: ConvexClient, r: SyncRoast): Promise<string> {
   // finalize: push the curve as fixed windows, then finalize (server assembles).
   const chunks = chunkCurve(r.curve);
   for (const [i, chunk] of chunks.entries()) {
-    await client.mutation(fns.appendSampleChunk, appendChunkArgs(r, i, chunk));
+    await http.mutation(fns.appendSampleChunk, appendChunkArgs(r, i, chunk));
   }
-  const res = (await client.mutation(fns.finalizeRoast, finalizeArgs(r))) as {
+  const res = (await http.mutation(fns.finalizeRoast, finalizeArgs(r))) as {
     batchId: string;
   };
   return res.batchId;
@@ -73,13 +73,28 @@ async function syncOne(client: ConvexClient, r: SyncRoast): Promise<string> {
  * Drain the outbox. Returns the count synced this pass, the remaining pending
  * count, and any gate/cap/error that halted it (so the UI can route the user).
  */
-export async function flushOutbox(client: ConvexClient): Promise<FlushResult> {
+export async function flushOutbox(
+  http: ConvexHttpClient,
+  getToken: () => Promise<string | null>,
+): Promise<FlushResult> {
   const pending = await ipc.syncPending(25);
   let synced = 0;
 
   for (const roast of pending) {
+    // Set a fresh convex-template JWT before each roast (clerk-js caches ~60s
+    // and refreshes near expiry, so this keeps every request authenticated).
+    const token = await getToken();
+    if (!token) {
+      return {
+        synced,
+        pending: await ipc.syncPendingCount().catch(() => pending.length - synced),
+        gate: 'unauthenticated',
+        error: 'No Droptime auth token — sign in again.',
+      };
+    }
+    http.setAuth(token);
     try {
-      const batchId = await syncOne(client, roast);
+      const batchId = await syncOne(http, roast);
       await ipc.syncMarkSynced([
         { outboxId: roast.outboxId, clientRoastId: roast.clientRoastId, batchId },
       ]);

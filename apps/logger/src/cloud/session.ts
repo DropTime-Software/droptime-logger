@@ -1,5 +1,5 @@
 /**
- * CloudSession — owns clerk-js (headless) + the authed Convex client.
+ * CloudSession — owns clerk-js (headless) + a Convex HTTP client for the flusher.
  *
  * Sign-in (build plan §9, loopback variant promoted to v1 primary):
  *   1. start a one-shot Rust loopback listener (oauth_start → port)
@@ -10,14 +10,15 @@
  *      signIn.create({ strategy: 'ticket', ticket }) → setActive  (pin this exact
  *      call; the signIn.ticket() wrapper is broken — clerk/javascript#8219)
  *
- * The Convex client authenticates with the Clerk `convex`-template JWT; clerk-js
- * owns the ~60s refresh loop.
+ * The flusher POSTs mutations through a `ConvexHttpClient` with a fresh
+ * `convex`-template Clerk JWT set per roast — the HTTP client authenticates each
+ * request directly, with none of the WebSocket client's connection-auth timing.
  *
- * GATE: end-to-end auth needs the LIVE Clerk instance (allowed_origins) + a human
- * sign-in from an installed build; it cannot be exercised headlessly.
+ * GATE: end-to-end auth needs the LIVE Clerk instance + a human sign-in from an
+ * installed build; it cannot be exercised headlessly.
  */
 import { Clerk } from '@clerk/clerk-js';
-import { ConvexClient } from 'convex/browser';
+import { ConvexHttpClient } from 'convex/browser';
 import { invoke } from '@tauri-apps/api/core';
 import { listen } from '@tauri-apps/api/event';
 import { openUrl } from '@tauri-apps/plugin-opener';
@@ -36,82 +37,32 @@ const SIGN_IN_TIMEOUT_MS = 5 * 60_000;
 
 export class CloudSession {
   private clerk: Clerk | null = null;
-  private convex: ConvexClient | null = null;
+  private convex: ConvexHttpClient | null = null;
   private ready = false;
-  private authed = false;
-  private authWaiters: Array<(v: boolean) => void> = [];
 
-  /** Load clerk-js (restoring any persisted session) and wire the Convex auth. */
+  /** Load clerk-js (restoring any persisted session) and create the client. */
   async init(): Promise<CloudAuthState> {
     if (this.ready) return this.state();
     installClerkFetchProxy();
     this.clerk = new Clerk(CLERK_PUBLISHABLE_KEY);
     await this.clerk.load({});
-    this.convex = new ConvexClient(CONVEX_URL);
-    this.wireConvexAuth();
+    this.convex = new ConvexHttpClient(CONVEX_URL);
     this.ready = true;
     return this.state();
   }
 
-  /**
-   * Point the Convex client at the current Clerk `convex`-template token. The
-   * `onChange` callback tracks when the Convex connection is ACTUALLY
-   * authenticated (a server round-trip after setAuth) — the flusher waits on
-   * this so mutations never race ahead of auth and hit UNAUTHENTICATED.
-   */
-  private wireConvexAuth(): void {
-    const clerk = this.clerk;
-    this.convex?.setAuth(
-      async ({ forceRefreshToken }: { forceRefreshToken: boolean }) => {
-        try {
-          return (
-            (await clerk?.session?.getToken({
-              template: 'convex',
-              skipCache: forceRefreshToken,
-            })) ?? null
-          );
-        } catch {
-          return null;
-        }
-      },
-      (isAuthenticated: boolean) => {
-        this.authed = isAuthenticated;
-        if (isAuthenticated) {
-          const waiters = this.authWaiters;
-          this.authWaiters = [];
-          waiters.forEach((w) => w(true));
-        }
-      },
-    );
-  }
-
-  /** Whether the Convex connection is currently authenticated. */
-  isAuthed(): boolean {
-    return this.authed;
-  }
-
-  /**
-   * Resolve once the Convex connection is authenticated, or `false` on timeout
-   * (e.g. the `convex` JWT template is missing or the token can't be minted).
-   * Callers should NOT flush when this returns false.
-   */
-  async waitForAuth(timeoutMs = 20_000): Promise<boolean> {
-    if (this.authed) return true;
-    if (this.state().status !== 'signed-in') return false;
-    return new Promise<boolean>((resolve) => {
-      const onResolve = (v: boolean) => {
-        clearTimeout(timer);
-        this.authWaiters = this.authWaiters.filter((w) => w !== onResolve);
-        resolve(v);
-      };
-      const timer = setTimeout(() => onResolve(false), timeoutMs);
-      this.authWaiters.push(onResolve);
-    });
-  }
-
-  /** The authed Convex client the flusher drains through (null until init). */
-  client(): ConvexClient | null {
+  /** The HTTP client the flusher POSTs mutations through (null until init). */
+  client(): ConvexHttpClient | null {
     return this.convex;
+  }
+
+  /** A fresh `convex`-template JWT for the current session, or null if none. */
+  async getToken(): Promise<string | null> {
+    try {
+      return (await this.clerk?.session?.getToken({ template: 'convex' })) ?? null;
+    } catch {
+      return null;
+    }
   }
 
   state(): CloudAuthState {
@@ -161,13 +112,12 @@ export class CloudSession {
       throw new Error(`sign-in incomplete (${si.status})`);
     }
     await clerk.setActive({ session: si.createdSessionId });
-    this.wireConvexAuth();
     return this.state();
   }
 
   async signOut(): Promise<CloudAuthState> {
     await this.clerk?.signOut();
-    this.wireConvexAuth();
+    this.convex?.clearAuth();
     return this.state();
   }
 }

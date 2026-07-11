@@ -81,18 +81,9 @@ export function CloudProvider({ children }: { children: ReactNode }) {
     if (!client) return;
     setSync((s) => ({ ...s, syncing: true, lastError: undefined, gate: undefined, cap: undefined }));
     try {
-      // Wait for the Convex connection to actually authenticate before the first
-      // mutation — otherwise it races ahead of auth and hits UNAUTHENTICATED.
-      const ready = await session.waitForAuth();
-      if (!ready) {
-        setSync((s) => ({
-          ...s,
-          syncing: false,
-          lastError: 'Could not authenticate with Droptime — try signing in again.',
-        }));
-        return;
-      }
-      const result = await flushOutbox(client);
+      // ConvexHttpClient authenticates each POST with the token set per roast in
+      // flushOutbox, so there's no connection-auth race to wait on.
+      const result = await flushOutbox(client, () => session.getToken());
       setSync({
         pending: result.pending,
         syncing: false,
