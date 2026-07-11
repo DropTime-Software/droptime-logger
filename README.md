@@ -107,7 +107,7 @@ When you want your data somewhere else, take it: **export any roast to `.alog`, 
 
 ## Droptime Cloud
 
-The Logger is complete and free, forever. If you later want sync across devices, AI roast readouts, or team, inventory, and wholesale tools, [Droptime Cloud](https://trydroptime.com) is the optional paid layer that adds them. We keep this seam honest and visible: it's a single **"coming soon"** card in Settings, and nothing about the free app changes if you never touch it.
+The Logger is complete and free, forever. Want sync across devices, AI roast readouts, or team, inventory, and wholesale tools? [Droptime Cloud](https://trydroptime.com) is the optional layer that adds them — **sign in from Settings and your roasts sync on their own**, each with an AI readout (in beta). Nothing about the free app changes if you never touch it.
 
 ## Contributing
 
