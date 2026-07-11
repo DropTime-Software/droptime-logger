@@ -349,8 +349,8 @@ function CloudPane({ mode }: { mode: AppMode }) {
                   )}
                 </div>
               )}
-              {!nudge && sync.lastError && (
-                <p className="mt-3 text-xs text-coral/90">Sync paused: {sync.lastError}</p>
+              {sync.lastError && (
+                <p className="mt-2 break-words text-xs text-coral/90">{sync.lastError}</p>
               )}
             </>
           )}

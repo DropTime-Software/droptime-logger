@@ -83,13 +83,23 @@ export async function flushOutbox(
   for (const roast of pending) {
     // Set a fresh convex-template JWT before each roast (clerk-js caches ~60s
     // and refreshes near expiry, so this keeps every request authenticated).
-    const token = await getToken();
+    let token: string | null;
+    try {
+      token = await getToken();
+    } catch (e) {
+      return {
+        synced,
+        pending: await ipc.syncPendingCount().catch(() => pending.length - synced),
+        gate: 'unauthenticated',
+        error: `getToken failed: ${e instanceof Error ? e.message : String(e)}`,
+      };
+    }
     if (!token) {
       return {
         synced,
         pending: await ipc.syncPendingCount().catch(() => pending.length - synced),
         gate: 'unauthenticated',
-        error: 'No Droptime auth token — sign in again.',
+        error: 'getToken returned null — no active session or the "convex" JWT template is missing.',
       };
     }
     http.setAuth(token);

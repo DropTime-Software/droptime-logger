@@ -56,13 +56,13 @@ export class CloudSession {
     return this.convex;
   }
 
-  /** A fresh `convex`-template JWT for the current session, or null if none. */
+  /**
+   * A fresh `convex`-template JWT for the current session, or null if there's no
+   * session. Lets a getToken() failure (e.g. missing JWT template) propagate so
+   * the flusher can surface the real reason instead of a generic "expired".
+   */
   async getToken(): Promise<string | null> {
-    try {
-      return (await this.clerk?.session?.getToken({ template: 'convex' })) ?? null;
-    } catch {
-      return null;
-    }
+    return (await this.clerk?.session?.getToken({ template: 'convex' })) ?? null;
   }
 
   state(): CloudAuthState {
