@@ -26,6 +26,7 @@ import type {
   RoastPatch,
   RoastSummaryDto,
   SampleEvent,
+  MarkSyncedArg,
   SaveCoffeeArgs,
   SaveMachineArgs,
   SerialPortDto,
@@ -35,6 +36,7 @@ import type {
   StartPortPreviewArgs,
   StartSessionArgs,
   StartSessionResult,
+  SyncRoast,
   UndoEventArgs,
   UpdateInfo,
 } from './dto';
@@ -134,6 +136,20 @@ export const ipc = {
 
   /** Notice-only; backend maps every failure to `null`. */
   checkForUpdate: () => invoke<UpdateInfo | null>('check_for_update'),
+
+  // ---- Cloud sync (Droptime Cloud — store/sync.rs) ----
+
+  /** Oldest-first pending roasts, assembled for the Cloud `logger.*` mutations. */
+  syncPending: (limit?: number) => invoke<SyncRoast[]>('sync_pending', { limit }),
+
+  /** Pending outbox count — for the sync-status indicator. */
+  syncPendingCount: () => invoke<number>('sync_pending_count'),
+
+  /** Ack rows the Cloud accepted (stamps synced_ms + synced_batch_id). */
+  syncMarkSynced: (acks: MarkSyncedArg[]) => invoke<void>('sync_mark_synced', { acks }),
+
+  /** Start a one-shot loopback listener for the auth callback; returns its port. */
+  oauthStart: () => invoke<number>('oauth_start'),
 } as const;
 
 /** Best-effort narrowing of a rejected invoke into a LoggerError. */

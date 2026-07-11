@@ -19,6 +19,7 @@ use crate::model::{
     SniffPortArgs, SniffResultDto, SourceInfo, StartPortPreviewArgs, StartSessionArgs,
     StartSessionResult, UndoEventArgs, UpdateInfoDto, UpdateRoastArgs, UpdateRoastMarkersArgs,
 };
+use crate::store::{MarkSyncedArg, SyncRoastDto};
 
 fn channel_emitter(on_event: Channel<SampleEvent>) -> Emitter {
     Box::new(move |ev| {
@@ -327,4 +328,58 @@ pub fn get_app_info(app: tauri::AppHandle) -> Result<AppInfoDto, LoggerError> {
 pub async fn check_for_update(app: tauri::AppHandle) -> Result<Option<UpdateInfoDto>, LoggerError> {
     let current = crate::update::app_info(&app).version;
     crate::update::check_for_update(&current)
+}
+
+// ---------------------------------------------------------------------------
+// Cloud sync (Droptime Cloud — store/sync.rs). The webview drainer owns the
+// authed Convex calls; these expose the durable outbox read/ack side.
+// ---------------------------------------------------------------------------
+
+/// Oldest-first pending sync rows, assembled for the Cloud logger.* mutations.
+#[tauri::command]
+pub async fn sync_pending(
+    engine: State<'_, Arc<Engine>>,
+    limit: Option<i64>,
+) -> Result<Vec<SyncRoastDto>, LoggerError> {
+    engine
+        .store()
+        .pending_sync(limit.unwrap_or(25).clamp(1, 200))
+}
+
+/// Count of pending outbox rows — for the sync-status indicator.
+#[tauri::command]
+pub async fn sync_pending_count(engine: State<'_, Arc<Engine>>) -> Result<i64, LoggerError> {
+    engine.store().pending_sync_count()
+}
+
+/// Atomically ack rows the Cloud accepted (stamps synced_ms + synced_batch_id).
+#[tauri::command]
+pub async fn sync_mark_synced(
+    engine: State<'_, Arc<Engine>>,
+    acks: Vec<MarkSyncedArg>,
+) -> Result<(), LoggerError> {
+    engine.store().mark_synced(acks)
+}
+
+/// Start a one-shot loopback listener for the Cloud sign-in callback; returns
+/// the bound port. Emits an `oauth-callback` event when the token arrives.
+#[tauri::command]
+pub async fn oauth_start(app: tauri::AppHandle) -> Result<u16, LoggerError> {
+    crate::cloud::start(app)
+}
+
+/// Proxy a Clerk-FAPI request through Rust (omits the Origin header Clerk
+/// rejects alongside Authorization). Allowlisted to clerk.trydroptime.com.
+#[tauri::command]
+pub async fn cloud_fetch(
+    req: crate::cloud::CloudFetchReq,
+) -> Result<crate::cloud::CloudFetchResp, LoggerError> {
+    crate::cloud::fetch(req)
+}
+
+/// Clear the proxy's stored Clerk cookies (called on sign-out).
+#[tauri::command]
+pub async fn cloud_clear_session() -> Result<(), LoggerError> {
+    crate::cloud::clear_cookies();
+    Ok(())
 }

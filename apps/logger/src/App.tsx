@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { appMode, ipc, type AppMode, type RecoveryDto } from './bridge';
 import { SessionProvider, useSession } from './state/SessionProvider';
+import { CloudProvider } from './state/CloudProvider';
 import { SettingsProvider } from './settings/SettingsProvider';
 import { Header } from './components/Header';
 import { StatusBanners } from './components/StatusBanners';
@@ -18,9 +19,11 @@ const MODE: AppMode = appMode();
 export default function App() {
   return (
     <SettingsProvider mode={MODE}>
-      <SessionProvider mode={MODE}>
-        <AppShell mode={MODE} />
-      </SessionProvider>
+      <CloudProvider>
+        <SessionProvider mode={MODE}>
+          <AppShell mode={MODE} />
+        </SessionProvider>
+      </CloudProvider>
     </SettingsProvider>
   );
 }

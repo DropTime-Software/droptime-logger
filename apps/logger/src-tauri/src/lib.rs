@@ -18,6 +18,7 @@
 
 mod alog;
 mod capture;
+mod cloud;
 mod error;
 mod ipc;
 mod math;
@@ -88,6 +89,13 @@ pub fn run() {
             ipc::delete_roast,
             ipc::get_app_info,
             ipc::check_for_update,
+            // Cloud sync (Droptime Cloud — store/sync.rs, cloud.rs)
+            ipc::sync_pending,
+            ipc::sync_pending_count,
+            ipc::sync_mark_synced,
+            ipc::oauth_start,
+            ipc::cloud_fetch,
+            ipc::cloud_clear_session,
         ])
         .build(tauri::generate_context!())
         .expect("error while building droptime-logger")
