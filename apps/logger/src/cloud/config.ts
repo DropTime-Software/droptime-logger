@@ -15,8 +15,8 @@ const env = import.meta.env as Record<string, string | undefined>;
 export const CLERK_PUBLISHABLE_KEY =
   env.VITE_CLERK_PUBLISHABLE_KEY || 'pk_live_Y2xlcmsudHJ5ZHJvcHRpbWUuY29tJA';
 
-/** Prod Convex deployment URL (*.convex.cloud). Build-time only; no default. */
-export const CONVEX_URL = env.VITE_CONVEX_URL || '';
+/** Prod Convex deployment URL (*.convex.cloud) — public; overridable at build. */
+export const CONVEX_URL = env.VITE_CONVEX_URL || 'https://kindred-crab-81.convex.cloud';
 
 /** The droptime-app origin that mints the sign-in token (/api/logger/auth). */
 export const APP_ORIGIN = env.VITE_APP_ORIGIN || 'https://app.trydroptime.com';
